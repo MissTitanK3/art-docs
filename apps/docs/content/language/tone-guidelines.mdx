@@ -1,0 +1,160 @@
+# Tone Guidelines
+
+## Framing Principles
+
+The language in this system must convey **permission, safety, and reversibility** rather than authority, precision, or institutional control.
+
+### Core Principles
+
+#### 1. Use Verbs Over Nouns
+
+**Why:** Verbs imply action and agency. Nouns create distance and formality.
+
+- ✅ "Report something"
+- ❌ "Create a report"
+
+- ✅ "Ask for help"
+- ❌ "Submit a need"
+
+#### 2. Use Outcomes Over Actions
+
+**Why:** Users care about the result, not the technical process.
+
+- ✅ "People can see this now"
+- ❌ "Report submitted"
+
+- ✅ "Your message is on its way"
+- ❌ "Queued for sync"
+
+#### 3. Use Permission Over Instruction
+
+**Why:** Permission reduces fear of making mistakes. Instructions create compliance anxiety.
+
+- ✅ "You can change this anytime"
+- ❌ "Edit your submission"
+
+- ✅ "You can stop and come back later"
+- ❌ "Save draft"
+
+#### 4. Calm Interface, Urgent Situation
+
+**Why:** The situation is already urgent. The UI should be a calming force, not amplify stress.
+
+- ✅ "Someone is in danger right now" (clear, factual)
+- ❌ "CRITICAL EMERGENCY!!!" (panic-inducing)
+
+- ✅ "Needs help soon" (directional)
+- ❌ "URGENT: IMMEDIATE RESPONSE REQUIRED" (overwhelming)
+
+**Avoid:**
+- ALL CAPS (except acronyms like GPS)
+- Exclamation points (except when celebrating success)
+- Red text for anything except true errors
+- Countdown timers that create artificial urgency
+- Loading spinners without explanatory text
+
+#### 5. Concrete Over Abstract
+
+**Why:** Abstract language requires interpretation. Under stress, interpretation capacity drops to zero.
+
+- ✅ "3 dispatchers online right now"
+- ❌ "Adequate coverage"
+
+- ✅ "Last seen 4 minutes ago"
+- ❌ "Recent activity"
+
+#### 6. Uncertainty Is Acceptable
+
+**Why:** Forcing false certainty creates analysis paralysis. Let users express doubt.
+
+- ✅ "I'm not sure, but I think..."
+- ❌ "Confirm incident type"
+
+- ✅ "Approximate is fine"
+- ❌ "Enter exact location"
+
+#### 7. Explain Consequences Before Actions
+
+**Why:** Fear of the unknown prevents action. Make outcomes predictable.
+
+- ✅ "This will notify 12 people nearby" → [Send]
+- ❌ [Confirm]
+
+- ✅ "This will close the dispatch. Anyone can reopen it." → [Close]
+- ❌ [Close Dispatch]
+
+---
+
+## Voice and Vocabulary
+
+### Default Voice: Supportive Peer
+
+Write as if you are a calm, experienced friend helping someone through a stressful moment. Not as a system, authority, or institution.
+
+**Examples:**
+
+| Institutional Voice | Supportive Peer Voice |
+| ------------------- | --------------------- |
+| "Submission received at 14:32:18 UTC" | "Got it. People can see this now." |
+| "Validation error: Required field missing" | "We need to know where this is happening" |
+| "Dispatch status updated to closed" | "This is marked as resolved. Thanks for the update." |
+| "Unauthorized access attempt" | "You don't have permission to see this. Need help?" |
+
+### Vocabulary Guidelines
+
+| Instead of... | Use... | Why |
+| ------------- | ------ | --- |
+| Submit | Send, Share | "Submit" is bureaucratic |
+| Request | Report, Ask | "Request" implies a hierarchy |
+| Validate | Check | "Validate" is technical jargon |
+| Status | What's happening | "Status" is database language |
+| Priority | How urgent | "Priority" implies a queue |
+| Assign | Ask [name] | "Assign" is task management language |
+| Confirm | Ready? | "Confirm" creates anxiety about correctness |
+| Cancel | Stop, Go back | "Cancel" feels like failure |
+| Error | Something went wrong | "Error" implies user fault |
+
+---
+
+## Contextual Tone Shifts
+
+### During Active Crisis (Dispatch Entry, Response)
+- **Minimal words, maximum clarity**
+- **No explanations unless requested**
+- **Every word earns its place**
+
+Example: "Where?" (not "Please enter the location of the incident")
+
+### During Review or Analysis (History, Filters, Reports)
+- **More context is helpful**
+- **Explain what data means**
+- **Educational tone is appropriate**
+
+Example: "This shows all dispatches from the past 7 days. Red dots are still open."
+
+### During Errors or Failures
+- **Never blame the user**
+- **Always explain what to do next**
+- **Offer a way out**
+
+Example: "This couldn't be saved. Your internet connection dropped. We'll try again in a moment, or you can tap 'Retry now.'"
+
+---
+
+## Copy Testing Checklist
+
+Before deploying any UI text, ask:
+
+1. **Would a stressed, non-technical person understand this in under 3 seconds?**
+2. **Does this increase or reduce fear?**
+3. **Is there a simpler word?**
+4. **Does this explain what happens next?**
+5. **Would this make sense to someone who's never used the system?**
+6. **Does this sound like a helpful human or a database?**
+7. **Can this be cut in half without losing meaning?**
+
+If the answer to any question is "no" or "I'm not sure," rewrite.
+
+---
+
+**Last Updated:** 2026-01-14

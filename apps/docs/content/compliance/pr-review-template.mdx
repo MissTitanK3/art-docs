@@ -1,0 +1,200 @@
+# Pull Request Review Template
+
+Use this template when reviewing code changes that touch dispatch-facing interfaces, crisis mode flows, or core dispatch logic.
+
+---
+
+## PR Information
+
+- **PR Number:** #____
+- **Title:** ____________________
+- **Author:** ____________________
+- **Reviewer:** ____________________
+- **Date:** ____________________
+
+---
+
+## Constitution Compliance Check
+
+### Does this PR touch any of the following?
+
+- [ ] Dispatch entry form
+- [ ] Active dispatch viewing
+- [ ] Urgency selection or display
+- [ ] Escalation logic
+- [ ] Offline sync behavior
+- [ ] Notification triggers
+- [ ] Closure/reopen workflows
+- [ ] User-facing error messages
+- [ ] Loading states or wait messages
+
+**If any box is checked, full constitution review is required.**
+
+---
+
+## Complexity Budget Review
+
+| Check | Result | Notes |
+| :---- | :----: | ----: |
+| Does dispatch entry have ≤3 user choices? | [ ] Pass [ ] Fail [ ] N/A | |
+| Are required fields still only location? | [ ] Pass [ ] Fail [ ] N/A | |
+| Are filters hidden by default? | [ ] Pass [ ] Fail [ ] N/A | |
+| Are new dropdowns limited to ≤5 visible options? | [ ] Pass [ ] Fail [ ] N/A | |
+
+**If any Fail:** Require design review before merge.
+
+---
+
+## Language Review
+
+| Check | Result | Notes |
+| :---- | :----: | ----: |
+| No database terms (status, validate, entity, persist)? | [ ] Pass [ ] Fail [ ] N/A | |
+| No role-specific jargon (dispatcher_admin, etc.)? | [ ] Pass [ ] Fail [ ] N/A | |
+| No ALL CAPS except acronyms? | [ ] Pass [ ] Fail [ ] N/A | |
+| All buttons explain their action? | [ ] Pass [ ] Fail [ ] N/A | |
+| All wait states have explanatory text? | [ ] Pass [ ] Fail [ ] N/A | |
+| All errors are human-readable and actionable? | [ ] Pass [ ] Fail [ ] N/A | |
+
+**If any Fail:** Request language revision before merge.
+
+---
+
+## Crisis Mode Invariants
+
+| Check | Result | Notes |
+| :---- | :----: | ----: |
+| No admin-only language in crisis-facing UI? | [ ] Pass [ ] Fail [ ] N/A | |
+| Destructive actions explain consequences? | [ ] Pass [ ] Fail [ ] N/A | |
+| No required dropdowns without defaults? | [ ] Pass [ ] Fail [ ] N/A | |
+| Actions confirm success or explain failure? | [ ] Pass [ ] Fail [ ] N/A | |
+
+**If any Fail:** Block merge, requires rework.
+
+---
+
+## Offline Behavior
+
+| Check | Result | Notes |
+| :---- | :----: | ----: |
+| Offline state visible before submission? | [ ] Pass [ ] Fail [ ] N/A | |
+| Failed sync retains data? | [ ] Pass [ ] Fail [ ] N/A | |
+| Retry mechanism is explicit? | [ ] Pass [ ] Fail [ ] N/A | |
+
+**If any Fail:** Block merge, requires rework.
+
+---
+
+## Accountability and Audit Logging
+
+| Check | Result | Notes |
+| :---- | :----: | ----: |
+| Closures logged with actor and timestamp? | [ ] Pass [ ] Fail [ ] N/A | |
+| Edits logged with actor and timestamp? | [ ] Pass [ ] Fail [ ] N/A | |
+| Escalations logged with actor and timestamp? | [ ] Pass [ ] Fail [ ] N/A | |
+| No punishment logic introduced? | [ ] Pass [ ] Fail [ ] N/A | |
+
+**If any Fail:** Block merge, requires rework.
+
+---
+
+## Mode Separation
+
+| Check | Result | Notes |
+| :---- | :----: | ----: |
+| Crisis URLs distinct from admin URLs? | [ ] Pass [ ] Fail [ ] N/A | |
+| No admin features leaking into crisis mode? | [ ] Pass [ ] Fail [ ] N/A | |
+| Lockdown mode respected? | [ ] Pass [ ] Fail [ ] N/A | |
+
+**If any Fail:** Block merge, requires rework.
+
+---
+
+## New Features Assessment
+
+### Does this PR add new required fields?
+- [ ] No
+- [ ] Yes → **Justification required.** Does it violate "location only" invariant?
+
+### Does this PR add new filters?
+- [ ] No
+- [ ] Yes → Are they hidden by default? [ ] Yes [ ] No
+
+### Does this PR add new role-based restrictions?
+- [ ] No
+- [ ] Yes → **Are they crisis-critical?** If not, consider removing.
+
+### Does this PR change notification behavior?
+- [ ] No
+- [ ] Yes → **Review against escalation invariants.**
+
+### Does this PR change urgency semantics?
+- [ ] No
+- [ ] Yes → **Review against urgency model.**
+
+---
+
+## Testing Requirements
+
+| Test Type | Required? | Completed? | Notes |
+| :------- | :-------: | :-------: | ---------: |
+| Manual testing of happy path | [ ] Yes [ ] No | [ ] | |
+| Manual testing of offline behavior | [ ] Yes [ ] No | [ ] | |
+| Manual testing with slow network | [ ] Yes [ ] No | [ ] | |
+| Testing with unauthenticated user | [ ] Yes [ ] No | [ ] | |
+| Testing with different roles | [ ] Yes [ ] No | [ ] | |
+| Error state testing | [ ] Yes [ ] No | [ ] | |
+| Mobile device testing | [ ] Yes [ ] No | [ ] | |
+
+**If any required test is incomplete:** Request completion before merge.
+
+---
+
+## Code Quality
+
+| Check | Result | Notes |
+| :---- | :----: | ----: |
+| No hardcoded strings (use i18n/constants) | [ ] Pass [ ] Fail [ ] N/A | |
+| Error handling includes user-facing messages | [ ] Pass [ ] Fail [ ] N/A | |
+| Loading states have explanatory text | [ ] Pass [ ] Fail [ ] N/A | |
+| No silent failures | [ ] Pass [ ] Fail [ ] N/A | |
+
+---
+
+## Regression Risk Assessment
+
+### Does this PR change:
+- [ ] Dispatch submission flow
+- [ ] Notification logic
+- [ ] Escalation triggers
+- [ ] Offline sync
+- [ ] Auth/permissions
+- [ ] Database schema
+
+**If any checked:** Require integration testing and staging deployment before production.
+
+### What could break?
+[List potential regression risks]
+
+### Rollback plan:
+[How to revert if this breaks production]
+
+---
+
+## Reviewer Decision
+
+- [ ] **Approve** - All checks pass, constitution compliant
+- [ ] **Request Changes** - Fails constitution checks (specify below)
+- [ ] **Comment** - Non-blocking feedback
+
+### Required changes (if any):
+[List specific changes needed]
+
+### Blocking issues (if any):
+[List issues that prevent merge]
+
+---
+
+## Final Sign-off
+
+**Reviewer:** _________________ Date: _______

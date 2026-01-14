@@ -1,0 +1,20 @@
+# Threats and Tradeoffs
+
+This system makes deliberate tradeoffs. Acknowledging them prevents future arguments framed as "we didn't consider this."
+
+| Tradeoff | What We Chose | What We Sacrificed | Why |
+| -------- | ------------- | ------------------ | --- |
+| **Transparency vs Privacy** | Open viewing of active dispatches | Confidentiality of locations during active response | Coordination requires visibility. Regions needing confidentiality should restrict at perimeter (VPN), not in app. |
+| **Speed vs Precision** | Minimal required fields, approximate locations | Data completeness at submission time | Getting something out matters more than getting it perfect. Enrichment happens after. |
+| **Accountability vs Anonymity** | Identity visible to responders | Anonymous reporting for marginalized users | Coordination requires knowing who is where. Anonymous channels should be parallel, not integrated. |
+| **Accessibility vs Control** | Anyone can close, reopen, escalate | Centralized authority over dispatch lifecycle | Hierarchy creates bottlenecks. Distributed action with audit trails is safer. |
+| **Simplicity vs Power** | Hidden filters, minimal wizard, progressive disclosure | Immediate access to advanced features | First-time users under stress are the design target. Power users can unlock complexity. |
+
+These are not mistakes to be fixed. They are positions to be defended.
+
+---
+
+**Classification:** System Constitution (binding intent)  
+**Last Updated:** 2026-01-14
+
+This document should be treated as policy. Engineers, admins, and responders may cite it in disagreements. That is intentional.

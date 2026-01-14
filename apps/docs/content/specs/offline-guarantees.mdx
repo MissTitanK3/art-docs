@@ -1,0 +1,17 @@
+# Offline and Sync Guarantees
+
+## Design Forks: Offline and Sync
+
+| Question | Position |
+| ---------- | ---------- |
+| **What guarantees exist for queued reports?** | Reports are persisted to local storage immediately. Sync uses exponential backoff: first 5 minutes every 30 seconds, next 30 minutes every 2 minutes, then every 15 minutes. Retries pause if battery below 15% when battery API is available (best-effort, not supported on all platforms). After 24 hours, user is prompted to retry or discard. |
+| **How are duplicate offline submissions handled?** | Idempotency by client-generated ID. If same ID is submitted twice, server dedupes silently. No duplicate dispatches. |
+| **Is offline status visible before submission?** | Yes. Banner: "You're offline. Your report will send when you reconnect." Shown on entry, not just on failure. |
+| **What does the user see if sync fails permanently?** | After 24 hours: "This report couldn't be sent. [Retry] [Save to device] [Discard]." Report is never silently lost. |
+| **Is there a manual "retry now" affordance?** | Yes. Pull-to-refresh or explicit "Sync now" button in offline queue view. |
+
+**Principle:** Offline must never feel like abandonment. The user must always know what happened and what to do next.
+
+---
+
+**Last Updated:** 2026-01-14

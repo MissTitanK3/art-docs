@@ -1,0 +1,53 @@
+# Hard Constraints and Invariants
+
+**Invariant Set Version:** 1.0
+
+These are non-negotiable rules. They prevent regression and provide guardrails for implementation.
+
+## Complexity Budget
+
+| Constraint | Limit |
+| ---------- | ----- |
+| **Maximum choices on dispatch entry screen** | 3 (location, description, urgency) |
+| **Maximum required fields to submit** | 1 (location only) |
+| **Maximum filters visible by default** | 0 (hidden behind "Filter" button) |
+| **Maximum steps in dispatch wizard** | 5 |
+| **Maximum roles shown in any dropdown** | 5 (with "Show all" expansion) |
+
+Hard limits prevent regression. When someone proposes adding a fourth required field, this document says no.
+
+## Crisis Mode Invariants
+
+These must always be true in crisis mode (dispatch entry, active dispatch view):
+
+1. **No admin-only language.** If a term requires role knowledge to understand, it cannot appear.
+2. **No irreversible actions without explanation.** Every destructive button must show what will happen.
+3. **No required dropdowns.** All selections must have a sensible default or be optional.
+4. **No jargon in error messages.** Errors must be human-readable and suggest next steps.
+5. **No login-gated viewing of active dispatches.** If someone has the URL, they can see the situation (submit requires auth). *Tradeoff acknowledgment: This increases transparency at the cost of confidentiality. Regions handling sensitive operations may restrict viewing at the perimeter level (VPN, network policy), but never at the core dispatch entry level.*
+6. **PII redaction for unauthenticated viewers.** Screens shown to unauthenticated viewers must omit personally identifying information beyond first name or role label. This preserves transparency and situational awareness while reducing screenshot harm.
+7. **No silent failures.** Every action must confirm success or explain failure.
+8. **Entering or exiting lockdown mode must be visible to all users.** Lockdown entry/exit is logged with actor, timestamp, and stated reason.
+9. **Lockdown mode must auto-expire after 24 hours unless explicitly renewed.** This prevents forgotten lockdowns and silent long-term mode drift.
+
+## Offline Invariants
+
+1. **Queued submissions persist across app restart.**
+2. **Offline status is visible before the user starts typing.**
+3. **Sync failure never silently discards data.**
+4. **Retry is always manual or clearly automatic. Never ambiguous.**
+
+## Accountability Invariants
+
+1. **All closures, edits, and escalations are logged with actor and timestamp.**
+2. **No automated punishment exists in the system.**
+3. **Logs are visible to dispatchers; summaries are visible to responders.**
+4. **"Turned out okay" is never labeled as failure in UI or metrics.**
+
+---
+
+**Classification:** System Constitution (binding intent)  
+**Last Updated:** 2026-01-14  
+**Review Cycle:** Quarterly, or after any major incident
+
+This document should be treated as policy. Engineers, admins, and responders may cite it in disagreements. That is intentional.

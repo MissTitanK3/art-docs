@@ -1,0 +1,14 @@
+{
+  "startingReport": "You are starting a report",
+  "canStopAnytime": "You can stop anytime",
+  "nothingIsFinal": "Nothing is final until you send",
+  "approximateIsFine": "Approximate is fine",
+  "canUpdateLater": "You can update this later",
+  "notSurePickMiddle": "If you are not sure, pick the middle option",
+  "reportIsLive": "Your report is live",
+  "peopleCanSeeThis": "People can see this now",
+  "youWillBeNotified": "You will be notified if someone responds",
+  "reportSavedOffline": "This report will send when you are back online",
+  "urgencyCanChange": "Urgency can be changed later",
+  "reopenedNeedsContext": "Recently reopened. Please add context if reopening again"
+}

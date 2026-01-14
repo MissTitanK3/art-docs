@@ -1,0 +1,149 @@
+# Pre-Deployment Invariant Checklist
+
+This checklist must be completed before deploying any changes to dispatch-facing interfaces. All items must be verified as "Pass" or the deployment should be blocked.
+
+**Version:** 1.0  
+**Last Updated:** 2026-01-14
+
+---
+
+## Complexity Budget Compliance
+
+| # | Invariant | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 1 | Dispatch entry screen has ≤3 user choices | Count decision points on screen | [ ] |
+| 2 | Only location is required to submit | Attempt submission with location only | [ ] |
+| 3 | Zero filters visible by default | Check initial page load | [ ] |
+| 4 | Dispatch wizard has ≤5 steps | Count wizard steps | [ ] |
+| 5 | Role dropdowns show ≤5 options (before "Show all") | Check all role selectors | [ ] |
+
+---
+
+## Crisis Mode Invariants
+
+| # | Invariant | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 6 | No admin-only language visible in crisis mode | Scan all UI text for role-specific terms | [ ] |
+| 7 | All destructive actions explain consequences | Check all delete/close/cancel buttons | [ ] |
+| 8 | No required dropdowns (all have defaults) | Attempt to proceed without selecting | [ ] |
+| 9 | All error messages are human-readable | Trigger errors and review language | [ ] |
+| 10 | Active dispatches viewable without login | Test with unauthenticated session | [ ] |
+| 11 | PII redacted for unauthenticated viewers | View dispatch as logged-out user | [ ] |
+| 12 | All actions confirm success or explain failure | Submit dispatch, close dispatch, edit dispatch | [ ] |
+| 13 | Lockdown mode entry/exit visible to all users | Trigger lockdown and verify banner | [ ] |
+| 14 | Lockdown mode auto-expires after 24 hours | Verify expiration logic exists | [ ] |
+
+---
+
+## Offline Invariants
+
+| # | Invariant | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 15 | Queued submissions persist across app restart | Submit offline, restart app, verify queue | [ ] |
+| 16 | Offline status visible before user types | Disconnect network, open form | [ ] |
+| 17 | Sync failure never silently discards data | Force sync failure, verify data retained | [ ] |
+| 18 | Retry affordance is explicit | Check offline queue UI for retry button | [ ] |
+
+---
+
+## Accountability Invariants
+
+| # | Invariant | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 19 | All closures logged with actor and timestamp | Close dispatch, check audit log | [ ] |
+| 20 | All edits logged with actor and timestamp | Edit dispatch, check audit log | [ ] |
+| 21 | All escalations logged with actor and timestamp | Trigger escalation, check audit log | [ ] |
+| 22 | No automated punishment mechanisms exist | Review codebase for penalty logic | [ ] |
+| 23 | Logs visible to dispatchers | Log in as dispatcher, view audit trail | [ ] |
+| 24 | Log summaries visible to responders | Log in as responder, verify "last updated" | [ ] |
+| 25 | "Turned out okay" never labeled as failure | Check closure reasons and metrics dashboard | [ ] |
+
+---
+
+## Language Compliance
+
+| # | Check | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 26 | No database terms in UI (status, validate, entity) | Scan all visible text | [ ] |
+| 27 | No role-specific jargon (dispatcher_admin, etc.) | Scan all visible text | [ ] |
+| 28 | No ALL CAPS except acronyms | Scan all visible text | [ ] |
+| 29 | No exclamation points except success messages | Scan all visible text | [ ] |
+| 30 | All buttons explain their action | Review all button labels | [ ] |
+| 31 | All wait states have explanatory text | Trigger loading states | [ ] |
+
+---
+
+## Mode Separation
+
+| # | Invariant | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 32 | Crisis URLs distinct from admin URLs | Check URL patterns | [ ] |
+| 33 | Mode toggle visible in header | Check header UI | [ ] |
+| 34 | Warning banner shows during admin mode if crisis active | Trigger crisis, enter admin mode | [ ] |
+| 35 | Lockdown mode forces all users to crisis view | Trigger lockdown, attempt admin access | [ ] |
+
+---
+
+## Dispatch Flow Compliance
+
+| # | Check | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 36 | Can complete dispatch in ≤90 seconds | Time first-time user flow | [ ] |
+| 37 | Approximate location is acceptable | Submit with neighborhood name only | [ ] |
+| 38 | Free-text description is never required | Submit with location only | [ ] |
+| 39 | Urgency has sensible default | Check default urgency selection | [ ] |
+| 40 | "Report received" confirmation appears | Submit dispatch, verify confirmation | [ ] |
+| 41 | "X people notified" confirmation appears | Submit dispatch, verify notification count | [ ] |
+
+---
+
+## Escalation Compliance
+
+| # | Check | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 42 | Escalation triggers after 10 min no response | Create dispatch, wait, verify escalation | [ ] |
+| 43 | Escalation visible to reporter | View as reporter, verify notification | [ ] |
+| 44 | Escalation cap (max 3 concurrent per user) works | Create multiple escalating dispatches | [ ] |
+| 45 | "Help is coming" pauses escalation timer | Mark "help coming", verify timer stops | [ ] |
+
+---
+
+## Urgency Compliance
+
+| # | Check | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 46 | Urgency changes are logged | Change urgency, verify audit log | [ ] |
+| 47 | Critical urgency triggers immediate notification | Submit critical dispatch, verify notification | [ ] |
+| 48 | Low urgency does not trigger push notification | Submit low dispatch, verify no push | [ ] |
+| 49 | Urgency auto-downgrades after 2 hours | Create dispatch, wait 2 hours (or mock time) | [ ] |
+| 50 | Downgrade is visible and reversible | Trigger downgrade, verify UI message | [ ] |
+
+---
+
+## Closure and Reopen Compliance
+
+| # | Check | Verification | Pass/Fail |
+| :--- | :-----: | :-------------: | -------: |
+| 51 | Closed dispatches have 15-minute reopen window | Close dispatch, verify reopen button | [ ] |
+| 52 | Reopen button visible with actor and time | Check closed dispatch UI | [ ] |
+| 53 | Anyone authenticated can reopen | Test reopen with different user | [ ] |
+| 54 | Reopen friction message appears after reopen | Reopen, close, reopen again, verify message | [ ] |
+
+---
+
+## Success Criteria
+
+**To pass this checklist:**
+- All items must be marked "Pass"
+- Any "Fail" blocks deployment
+- Any "N/A" must be justified in writing and approved by regional admin
+
+**Sign-off:**
+
+- Engineer: _________________ Date: _______
+- Reviewer: _________________ Date: _______
+- Regional Admin: ___________ Date: _______
+
+---
+
+**Last Updated:** 2026-01-14

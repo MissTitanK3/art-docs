@@ -1,0 +1,11 @@
+{
+  "name": "@repo/locales",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./en/actions": "./en/actions.json",
+    "./en/states": "./en/states.json",
+    "./en/errors": "./en/errors.json",
+    "./en/reassurance": "./en/reassurance.json"
+  }
+}

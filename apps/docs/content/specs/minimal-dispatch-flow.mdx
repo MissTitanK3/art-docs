@@ -1,0 +1,106 @@
+# Minimal Dispatch Flow
+
+**Constraints met:**
+
+- ≤5 user decisions to start a response
+- Plain, non-authoritative language
+- Each step answers only one question
+
+---
+
+## Step 1: Entry Point
+
+**User sees:**
+> "Something happening? Tap to report."
+
+**System captures:**
+
+- Current timestamp (auto)
+- User ID from session (auto)
+- Entry source (manual/watch/map)
+
+**System reassures:**
+> "You're starting a report. You can stop anytime. Nothing is final until you say so."
+
+---
+
+## Step 2: Location
+
+**User sees:**
+> "Where is this happening?"
+> [Map with circle radius] or [Use my location] or [Type an address]
+> "Zoom in until you're not sure anymore. The circle shows the area."
+
+**System captures:**
+
+- Center latitude/longitude
+- Radius (in meters, based on zoom level)
+- Location label (reverse geocoded or user-entered)
+
+**System reassures:**
+> "Approximate is fine. You can update this later."
+
+---
+
+## Step 3: What's Happening
+
+**User sees:**
+> "What's going on? (A few words is enough)"
+> [Large text input, no character limit]
+
+**System captures:**
+
+- Free-text description
+- Optional: detected keywords for suggested tags
+
+**System reassures:**
+> "You don't need to have all the details. Write what you know."
+
+---
+
+## Step 4: Urgency
+
+**User sees:**
+> "How urgent is this?"
+> [Three buttons:]
+>
+> - "They're okay for now"
+> - "Needs help soon"
+> - "Someone is in danger right now"
+
+**System captures:**
+
+- Urgency level (low / normal / critical)
+
+**System reassures:**
+> "If you're not sure, pick the middle one. We can adjust."
+
+---
+
+## Step 5: Confirm and Send
+
+**User sees:**
+> "Ready to send this?"
+> [Summary card showing: location, description, urgency]
+> [Send Report] [Edit Something]
+
+**System captures:**
+
+- Submission timestamp
+- Status = "open"
+
+**System reassures:**
+> "Your report is live. People can see it now. You'll get a notification if someone responds."
+
+---
+
+### **Total decisions: 4**
+
+1. Where?
+2. What?
+3. How urgent?
+4. Send?
+
+---
+
+**Last Updated:** 2026-01-14

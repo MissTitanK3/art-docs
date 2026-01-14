@@ -1,0 +1,18 @@
+{
+  "index": { "title": "Overview" },
+  "constitution": {
+    "title": "Constitution"
+  },
+  "specs": {
+    "title": "Specs"
+  },
+  "compliance": {
+    "title": "Compliance"
+  },
+  "language": {
+    "title": "Language"
+  },
+  "versions": {
+    "title": "Versions"
+  }
+}

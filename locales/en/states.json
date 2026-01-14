@@ -1,0 +1,19 @@
+{
+  "open": "Still needs response",
+  "closed": "Closed",
+  "resolved": "Resolved",
+  "turnedOutOkay": "Turned out okay",
+  "stale": "No recent updates",
+  "responding": "Someone is responding",
+  "noResponseYet": "No one has responded yet",
+  "notified": "People have been notified",
+  "syncing": "Syncing",
+  "offline": "Offline",
+  "online": "Online",
+  "urgentLow": "They are okay for now",
+  "urgentNormal": "Needs help soon",
+  "urgentCritical": "Someone is in danger",
+  "lastUpdated": "Last updated",
+  "activeSituations": "Active situations",
+  "nothingHappening": "Nothing happening right now"
+}

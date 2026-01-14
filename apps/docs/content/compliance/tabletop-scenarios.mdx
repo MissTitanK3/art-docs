@@ -1,0 +1,410 @@
+# Tabletop Scenarios for Constitution Compliance
+
+These scenarios test whether the system adheres to its constitution under realistic stress conditions. Use them for design review, user testing, and post-deployment verification.
+
+**Version:** 1.0  
+**Last Updated:** 2026-01-14
+
+---
+
+## How to Use These Scenarios
+
+1. **Pick a scenario** relevant to your changes
+2. **Walk through the flow** as if you are the user in the scenario
+3. **Document friction points** where the system creates hesitation, confusion, or fear
+4. **Verify invariants** are maintained throughout the flow
+5. **Note any violations** of language guidelines or design principles
+
+**Pass criteria:** User completes the task without external help, within target time, without expressed confusion or fear.
+
+---
+
+## Scenario 1: First-Time User Under Stress
+
+### Context
+**Actor:** Jamie, 19, college student, no prior dispatch experience  
+**Situation:** Sees someone collapsed on the sidewalk during morning walk  
+**Condition:** Stressed, never used the system, on mobile phone, shaky hands  
+**Goal:** Report the situation and get help
+
+### Success Criteria
+- Completes dispatch submission in under 90 seconds
+- Does not express confusion about what to do
+- Does not abandon the form
+- Receives clear confirmation that help is coming
+
+### Test Flow
+1. Jamie opens the app (no account yet, what happens?)
+2. Sees the main screen, is it clear what to do?
+3. Starts to report, is location capture obvious?
+4. Doesn't know medical terminology, can they describe in plain language?
+5. Not sure how urgent it is, can they express uncertainty?
+6. Submits, do they know what happens next?
+7. Sees confirmation, do they trust that help is coming?
+
+### Constitution Checks
+- [ ] No required fields besides location
+- [ ] No medical jargon or categorization required
+- [ ] Urgency has sensible default
+- [ ] Clear confirmation with "X people notified"
+- [ ] No language that implies expertise is needed
+
+### Violations to Watch For
+- Required "incident type" dropdown
+- "Validate location" error without explanation
+- "Submit request" instead of "Send report"
+- No confirmation message after submission
+- Loading spinner without explanatory text
+
+---
+
+## Scenario 2: Experienced Responder in a Hurry
+
+### Context
+**Actor:** Sam, 35, dispatcher for 2 years, responding to multiple active situations  
+**Situation:** Needs to quickly report a new situation while coordinating two others  
+**Condition:** High cognitive load, familiar with system, on laptop  
+**Goal:** Submit dispatch in under 30 seconds and get back to coordination
+
+### Success Criteria
+- Can use "quick report" mode if available
+- Can skip optional fields without friction
+- Submission confirms instantly
+- No modal dialogs or confirmation screens that slow them down
+
+### Test Flow
+1. Sam is already logged in and viewing active dispatches
+2. Needs to report something new, is there a fast path?
+3. Enters minimal info (location + description)
+4. Skips all optional fields, does system complain?
+5. Submits, are there blocking confirmation dialogs?
+6. Returns to active dispatch view, is the new dispatch visible immediately?
+
+### Constitution Checks
+- [ ] Quick path exists (single screen or fewer than 3 steps)
+- [ ] Optional fields are truly optional
+- [ ] No blocking confirmations for experienced users
+- [ ] Immediate feedback on submission
+
+### Violations to Watch For
+- No quick path. Forced through full wizard
+- "Are you sure?" confirmation dialogs
+- Optional fields marked with asterisks (confusing)
+- Redirect after submission instead of staying in context
+
+---
+
+## Scenario 3: Offline Submission in Remote Area
+
+### Context
+**Actor:** Alex, 28, volunteer responder, hiking in area with spotty coverage  
+**Situation:** Finds injured hiker, has phone but no signal  
+**Condition:** Offline, anxious about whether report will send  
+**Goal:** Submit report that will sync when back in range
+
+### Success Criteria
+- Can start submission while offline
+- Clear indication of offline status
+- Report is queued and persists across app close
+- Clear indication when report successfully syncs
+
+### Test Flow
+1. Alex opens app with no internet connection
+2. Attempts to submit dispatch, what happens?
+3. Sees offline indicator, is it clear what will happen?
+4. Fills out form, is data saved if they close the app?
+5. Hikes back into range, does report sync automatically?
+6. Sees sync confirmation, do they trust it worked?
+
+### Constitution Checks
+- [ ] Offline status visible before submission
+- [ ] "Report will send when you reconnect" message appears
+- [ ] Data persists across app restart
+- [ ] Sync success confirmation appears
+- [ ] Manual retry available if auto-sync fails
+
+### Violations to Watch For
+- "Network error" without explanation
+- Silent failure with no retry option
+- Data lost when app closes
+- No indication that report queued successfully
+- Ambiguous sync status ("Pending...")
+
+---
+
+## Scenario 4: Accidental Dispatch (False Alarm)
+
+### Context
+**Actor:** Jordan, 45, new volunteer, submitted a dispatch by mistake  
+**Situation:** Thought they saw something concerning but turned out to be nothing  
+**Condition:** Embarrassed, worried about "doing it wrong"  
+**Goal:** Mark dispatch as resolved without penalty
+
+### Success Criteria
+- Can close dispatch without shame
+- "Turned out okay" framing is available
+- No punitive language or warnings
+- Dispatch remains in history but marked resolved
+
+### Test Flow
+1. Jordan sees their active dispatch
+2. Realizes it was a false alarm, how do they fix this?
+3. Looks for close/resolve option, is it obvious?
+4. Sees closure options, is "Turned out okay" available?
+5. Closes dispatch, does system make them feel bad?
+6. Confirms closure, is it reversible if they were wrong?
+
+### Constitution Checks
+- [ ] Closure is easy to find
+- [ ] "Turned out okay" is an option
+- [ ] No "False alarm" or blame language
+- [ ] Reopen button available for 15 minutes
+- [ ] Closure logged but not penalized
+
+### Violations to Watch For
+- "False alarm" as only option
+- "Are you sure? This will waste responder time" language
+- No reopen option
+- Closure requires justification text (intimidating)
+- "Mark as error" framing
+
+---
+
+## Scenario 5: Dispatch Without Clear Location
+
+### Context
+**Actor:** Casey, 22, reporting something urgent but doesn't know exact address  
+**Situation:** Heard yelling and possible conflict but doesn't know the building number  
+**Condition:** Stressed, uncertain, worried about getting location wrong  
+**Goal:** Report situation with approximate location
+
+### Success Criteria
+- Can submit with approximate location (street or neighborhood)
+- No forced precision (no "enter exact coordinates")
+- Clear that approximate is acceptable
+- Location can be updated later
+
+### Test Flow
+1. Casey opens report form
+2. Doesn't know exact address, can they say "near X street"?
+3. System asks for location, is precision required?
+4. Submits with approximate location, does system accept it?
+5. Later, someone updates location, is this easy?
+
+### Constitution Checks
+- [ ] Approximate location is acceptable
+- [ ] No "Invalid location" errors for general areas
+- [ ] "Approximate is fine" messaging appears
+- [ ] Location is mutable after submission
+- [ ] Location updates are logged
+
+### Violations to Watch For
+- "Enter exact coordinates" requirement
+- Map that requires pin drop on specific building
+- "Invalid location format" error
+- No way to update location after submission
+- Required precision (GPS coordinates only)
+
+---
+
+## Scenario 6: Escalation During No-Response Period
+
+### Context
+**Actor:** Taylor, 30, submitted dispatch 15 minutes ago, no one has responded  
+**Situation:** Original dispatch still urgent, no indication anyone is coming  
+**Condition:** Anxious about whether anyone saw the dispatch  
+**Goal:** Ensure someone is notified
+
+### Success Criteria
+- Auto-escalation triggers after 10 minutes
+- Reporter sees escalation message
+- Escalation feels like "system is working" not "system failed"
+- Reporter can manually trigger escalation if needed
+
+### Test Flow
+1. Taylor submitted dispatch 15 minutes ago
+2. No "I'm responding" from anyone, what happens?
+3. Sees escalation notification, is it clear what this means?
+4. Escalation widens to more responders, is this visible?
+5. Someone finally responds, does Taylor see this?
+
+### Constitution Checks
+- [ ] Escalation triggers automatically after 10 min
+- [ ] Reporter sees "We're notifying more people" message
+- [ ] Escalation does not feel like failure
+- [ ] Reporter can see when someone responds
+- [ ] Manual escalation option available
+
+### Violations to Watch For
+- No escalation happens (silent timeout)
+- "No responders available" message without next steps
+- Escalation feels like system failure
+- Reporter has no visibility into escalation status
+- No way to manually escalate earlier
+
+---
+
+## Scenario 7: Closing Dispatch Prematurely (Reopen Required)
+
+### Context
+**Actor:** Morgan, 40, closed a dispatch thinking it was resolved, but situation re-escalated  
+**Situation:** Closed dispatch 5 minutes ago, now needs to reopen  
+**Condition:** Worried about looking indecisive or "doing it wrong"  
+**Goal:** Reopen dispatch without penalty
+
+### Success Criteria
+- Reopen button visible for 15 minutes after closure
+- Reopening requires minimal friction
+- No shame or "are you sure" dialogs
+- Reopen is logged but not penalized
+
+### Test Flow
+1. Morgan closed dispatch 5 minutes ago
+2. Situation changes, needs to reopen
+3. Looks for reopen option, is it visible?
+4. Clicks reopen, does system question this decision?
+5. Dispatch is reopened, is this logged?
+6. If reopened again, does friction increase appropriately?
+
+### Constitution Checks
+- [ ] Reopen button visible for 15 minutes
+- [ ] Reopen requires no justification
+- [ ] No "Are you sure?" dialogs
+- [ ] Reopen is logged with actor
+- [ ] Repeat reopens show friction message (anti-thrash)
+
+### Violations to Watch For
+- No reopen option
+- Reopen requires explanation (intimidating)
+- "This has been closed X times" shame language
+- Hard block on reopening after N attempts
+- Closure feels permanent
+
+---
+
+## Scenario 8: Admin Accidentally Enters Crisis During Active Dispatch
+
+### Context
+**Actor:** Chris, 50, regional admin checking settings during an active event  
+**Situation:** Three dispatches are open and need attention  
+**Condition:** Distracted by admin task, may forget about active crisis  
+**Goal:** Complete admin task but be reminded of active dispatches
+
+### Success Criteria
+- Warning banner appears in admin mode
+- Banner shows count of active dispatches
+- Quick link to return to crisis view
+- No hard block on admin access (just a warning)
+
+### Test Flow
+1. Chris is in crisis mode, sees 3 active dispatches
+2. Switches to admin mode to check dispatcher schedule
+3. System warns about active dispatches, is this visible?
+4. Chris finishes admin task, can they quickly return to crisis view?
+5. Lockdown mode is triggered, does admin mode become restricted?
+
+### Constitution Checks
+- [ ] Warning banner shows in admin mode
+- [ ] Banner shows active dispatch count
+- [ ] Quick link back to crisis view
+- [ ] Lockdown mode restricts admin access
+- [ ] Lockdown entry/exit is visible and logged
+
+### Violations to Watch For
+- No warning about active crisis
+- Admin and crisis modes blur together
+- No way to quickly switch back
+- Lockdown mode is invisible or silent
+- Lockdown mode never expires
+
+---
+
+## Scenario 9: Urgency Downgrade After Situation Stabilizes
+
+### Context
+**Actor:** Riley, 26, marked dispatch as critical, situation has now stabilized  
+**Situation:** Initial panic was warranted, but help arrived and urgency is lower  
+**Condition:** Wants to reduce urgency without looking like they overreacted  
+**Goal:** Downgrade urgency without penalty
+
+### Success Criteria
+- Urgency can be changed by reporter
+- Downgrade is not framed as "you were wrong"
+- Change is logged but not penalized
+- UI language is neutral ("Situation has stabilized")
+
+### Test Flow
+1. Riley marked dispatch as critical 30 minutes ago
+2. Help arrived, situation is stable, wants to downgrade
+3. Looks for urgency control, can they find it?
+4. Changes urgency to "Low", does system question this?
+5. Downgrade is logged, is language neutral?
+
+### Constitution Checks
+- [ ] Reporter can change urgency
+- [ ] No "Are you sure?" dialogs
+- [ ] Language is neutral (not blame)
+- [ ] Change is logged with actor and time
+- [ ] Auto-downgrade after 2 hours works correctly
+
+### Violations to Watch For
+- Only dispatchers can change urgency
+- "Override priority?" language (implies mistake)
+- "This will deprioritize the dispatch" (intimidating)
+- No audit trail of urgency changes
+- Auto-downgrade without notification
+
+---
+
+## Scenario 10: New User Watching System Before First Use
+
+### Context
+**Actor:** Avery, 24, new volunteer, observing system to learn how it works  
+**Situation:** Viewing active dispatches before submitting their first report  
+**Condition:** Learning mode, not in crisis, evaluating usability  
+**Goal:** Understand system without submitting anything
+
+### Success Criteria
+- Can view active dispatches without account
+- Interface is not overwhelming
+- Can explore without fear of "breaking something"
+- Language is inviting, not intimidating
+
+### Test Flow
+1. Avery opens the app without logging in
+2. Sees active dispatch list, is it comprehensible?
+3. Clicks on a dispatch, can they view details?
+4. Sees close/reopen/escalate options, do they understand what these do?
+5. Decides to create account and submit first dispatch, does onboarding help?
+
+### Constitution Checks
+- [ ] Viewing dispatches does not require login
+- [ ] PII is redacted for unauthenticated users
+- [ ] Interface does not overwhelm with options
+- [ ] Onboarding (if present) is brief and helpful
+- [ ] First dispatch flow is simple
+
+### Violations to Watch For
+- Login wall before viewing dispatches
+- PII visible to unauthenticated users
+- Interface shows all filters/options at once
+- No empty state when no dispatches exist
+- Onboarding is lengthy or patronizing
+
+---
+
+## Scenario Scoring
+
+For each scenario, rate the experience:
+
+| Rating | Meaning |
+|--------|---------|
+| **Pass** | User completed task without confusion, within target time, no constitution violations |
+| **Pass with Friction** | User completed task but expressed confusion or hesitation; minor violations |
+| **Fail** | User could not complete task, abandoned flow, or major constitution violations |
+
+**Deployment gate:** No "Fail" ratings allowed. "Pass with Friction" requires documented follow-up fixes.
+
+---
+
+**Last Updated:** 2026-01-14

@@ -1,0 +1,107 @@
+# System Constitution
+
+## Design Anti-Patterns Explicitly Rejected
+
+This review identifies and rejects several recurring design patterns that increase cognitive load and suppress reporting under stress. These patterns are common in complex systems and, increasingly, in AI-oriented interfaces. They are inappropriate for human-centered dispatch.
+
+### Context Exhaustion UX
+
+**Description:** Interfaces that demand full context, categorization, and precision upfront, before the user understands the situation themselves.
+
+**Why it appears:** Often optimized for systems that need structured input early, including analytics pipelines, dashboards, or AI models that benefit from complete context windows.
+
+**Why it fails here:** People in crisis do not have a complete mental model. Forcing early structure creates paralysis, abandonment, or inaccurate data.
+
+**Our rejection:** Dispatch accepts partial, ambiguous, and evolving information. Structure is optional and additive, never required at entry.
+
+### Completeness-First Design
+
+**Description:** Workflows that prioritize "getting all the fields filled out" over enabling timely action.
+
+**Why it appears:** Optimizes for data hygiene, reporting, and backend certainty.
+
+**Why it fails here:** Completeness delays action. In emergencies, incomplete information is better than no information.
+
+**Our rejection:** A dispatch exists as soon as a location exists. Everything else is enrichment.
+
+### Premature Categorization
+
+**Description:** Requiring users to select types, presets, teams, or roles before they understand what is happening.
+
+**Why it appears:** Reflects internal taxonomies rather than user reality.
+
+**Why it fails here:** Users guess or freeze. Both outcomes degrade system trust.
+
+**Our rejection:** Free-text description precedes categorization. Categories are suggested, never demanded.
+
+### Institutional and Authority-Encoded Language
+
+**Description:** Language that implies permission, expertise, or correctness is required to proceed.
+
+**Why it appears:** Inherited from administrative, enterprise, or compliance-driven systems.
+
+**Why it fails here:** Creates fear of "doing it wrong," especially for non-professionals.
+
+**Our rejection:** Language emphasizes permission, reversibility, and shared responsibility.
+
+### Dashboard-First Thinking
+
+**Description:** Design optimized for monitoring, filtering, and analysis rather than initiation.
+
+**Why it appears:** Built by and for experienced operators.
+
+**Why it fails here:** First-time users under stress encounter too many decisions too early.
+
+**Our rejection:** Initiation flows are minimal. Analysis tools are hidden until explicitly requested.
+
+### Silent System State
+
+**Description:** Systems that assume users will infer success, failure, or progress.
+
+**Why it appears:** Engineering-centric assumptions about happy paths.
+
+**Why it fails here:** Silence is interpreted as failure or abandonment.
+
+**Our rejection:** All actions confirm success or explain failure. Silence is treated as a bug.
+
+**Guiding Statement:** This system is intentionally human-paced, ambiguity-tolerant, and forgiveness-oriented. It is designed for people who are uncertain, stressed, and acting in good faith. Not for systems that demand perfect context.
+
+---
+
+## Design Principles for Dispatch Simplification
+
+### 1. "A dispatch exists even if incomplete."
+
+Once a location is captured, the dispatch is real. Everything else is enrichment.
+
+### 2. "Never require precision before understanding."
+
+Users cannot categorize, label, or sort what they don't yet understand. Let them describe first, categorize later (or never).
+
+### 3. "Assume nothing is known until proven otherwise."
+
+Default all optional fields to "unknown" or "pending." Do not force the user to guess or invent data.
+
+### 4. "Visibility of system state reduces fear."
+
+Show what's happening: "3 dispatchers online," "Report seen by 2 people," "Last update 4 min ago." Silence is terrifying.
+
+### 5. "The cost of backtracking must be near zero."
+
+If editing, canceling, or correcting a submission feels irreversible or shameful, users will abandon rather than risk being wrong.
+
+### 6. "Offline behavior must be predictable."
+
+The system should queue submissions when offline and clearly indicate sync status. "This will send when you're back online" is acceptable. Silent failure is not.
+
+### 7. "Cognitive load is measured in decisions, not fields."
+
+A single open-ended text box is less taxing than three dropdowns. Reduce decisions, not inputs.
+
+---
+
+**Classification:** System Constitution (binding intent)  
+**Last Updated:** 2026-01-14  
+**Review Cycle:** Quarterly, or after any major incident
+
+This document should be treated as policy. Engineers, admins, and responders may cite it in disagreements. That is intentional.

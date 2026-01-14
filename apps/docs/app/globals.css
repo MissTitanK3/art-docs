@@ -1,0 +1,30 @@
+.nextra-mobile-nav {
+  z-index: 10 !important;
+  background-color: var(--x-color-neutral-50);
+  opacity: 0.99;
+}
+
+.dark .nextra-mobile-nav {
+  background-color: var(--x-color-neutral-900);
+  z-index: 10 !important;
+  opacity: 0.99;
+}
+
+.nextra-mobile-nav .nextra-navbar-blur {
+  /* Ensure the blur backdrop within the mobile nav sits above content. */
+  z-index: 1;
+}
+
+.dark .nextra-mobile-nav .nextra-navbar-blur {
+  background-color: color(var(--x-color-neutral-700));
+}
+
+/* Custom navbar styling — className utilities like `bg-red-900` are not available
+   because the theme ships prebuilt styles with `x:`-prefixed classes. Use globals instead. */
+header.nextra-navbar {
+  z-index: 9999;
+}
+
+.nextra-body {
+  z-index: 0;
+}

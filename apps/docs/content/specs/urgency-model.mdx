@@ -1,0 +1,23 @@
+# Urgency Semantics
+
+## Design Forks: Urgency
+
+| Question | Position |
+| ---------- | ---------- |
+| **Who can change urgency after submission?** | Reporter, any responder, or dispatcher. Changes are logged. Urgency is a living signal, not a fixed label. |
+| **Is urgency a signal, priority, or promise?** | **Signal.** It affects notification order and visual prominence, but does not guarantee response time. Language: "This feels urgent" not "This is Priority 1." |
+| **Does urgency affect notification fan-out?** | Yes. "Critical" notifies immediately with sound/vibration. "Normal" notifies silently. "Low" appears in feed only, no push. |
+| **Can urgency decay automatically?** | Yes. After 2 hours with no update, urgency auto-downgrades one level (critical → normal → low). Decay is visible and actionable. |
+| **Is "critical" reversible without penalty?** | **Yes, always.** Downgrading urgency is neutral, not shameful. Language: "Situation has stabilized" not "Urgency was wrong." |
+
+## Decay Floor (Invariant)
+
+Urgency decay must always be visible and reversible. UI copy when decay occurs: "Urgency reduced due to no updates for 2 hours. You can raise it again at any time." 
+
+Users may also pause decay by marking "Still active, checking in." Decay without explanation feels like abandonment.
+
+**Principle:** Urgency is mutable and forgiving. Overcalling is safer than undercalling.
+
+---
+
+**Last Updated:** 2026-01-14

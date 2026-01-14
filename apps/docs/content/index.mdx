@@ -1,0 +1,292 @@
+# Region Dispatch System Constitution
+
+**Date**: 2026-01-14  
+**Subject**: Feature set for cognitive load reduction and accessibility improvement  
+**Classification**: System Constitution (binding intent)  
+**Version**: 1.0
+
+---
+
+## Executive Summary
+
+The Region PNW dispatch system (`apps/region-pnw`) currently presents significant cognitive barriers for non-professional responders. The system favors completeness over usability, requiring users to navigate complex filter interfaces, multi-step forms, and role-gated features during high-stress situations.
+
+**Key findings:**
+
+- Pages average 300-1200+ lines of code with 7-10 filters per view
+- Role-based access creates uncertainty about what users can/cannot do
+- Multi-step forms request information before users can provide it
+- No clear "minimum viable dispatch" path exists
+- Failure states are silent or unclear
+
+The complexity exists because the problem *is* complex. But the goal of this review is not to remove features. It is to ensure that **the most important features are the most accessible**, and that **fear of doing it wrong never prevents someone from doing it at all.**
+
+The measure of success is not how many features exist. It is how many people actually use the system when it matters.
+
+---
+
+## Document Navigation
+
+### Core Constitution
+
+- **[System Constitution](/constitution/system-constitution)** - Design anti-patterns explicitly rejected and core design principles
+- **[Invariants](/constitution/invariants)** - Non-negotiable rules and complexity budgets
+- **[Non-Goals](/constitution/non-goals)** - What this system is explicitly not trying to be
+- **[Tradeoffs](/constitution/tradeoffs)** - Deliberate tradeoffs and acknowledged threats
+
+### Technical Specifications
+
+- **[Minimal Dispatch Flow](/specs/minimal-dispatch-flow)** - The 4-step flow to start a response
+- **[Escalation State Machine](/specs/escalation-state-machine)** - Escalation logic and load management
+- **[Urgency Model](/specs/urgency-model)** - Urgency semantics and decay behavior
+- **[Offline Guarantees](/specs/offline-guarantees)** - Offline sync behavior and guarantees
+
+### Language Guidelines
+
+- **[Approved Copy](/language/approved-copy)** - Language and framing corrections
+- **[Forbidden Language](/language/forbidden-language)** - Institutional language to avoid
+- **[Tone Guidelines](/language/tone-guidelines)** - Framing principles and communication style
+
+### Compliance
+
+- **[Invariant Checklist](/compliance/invariant-checklist)** - Pre-deployment verification checklist
+- **[PR Review Template](/compliance/pr-review-template)** - Code review checklist
+- **[Tabletop Scenarios](/compliance/tabletop-scenarios)** - Testing scenarios for constitution compliance
+
+---
+
+## Feature Triage
+
+### Core Required Features
+
+*Must exist for dispatch to function safely.*
+
+| Feature | Why Core |
+| --------- | ---------- |
+| **Location capture** | Cannot coordinate without knowing where. Single most important input. |
+| **"Something is happening" signal** | The system must accept that a situation exists, even without full details. |
+| **Who submitted** | Accountability. Can be auto-captured from auth. |
+| **Timestamp** | Critical for situational awareness. Auto-captured. |
+| **Notify available responders** | The system must tell people something is happening. |
+| **View active dispatches** | Responders must see what needs attention. |
+
+### Supportive but Optional Features
+
+*Improve outcomes but should not block use.*
+
+| Feature | Why Supportive |
+| --------- | ---------------- |
+| Dispatch filters (status, type, date) | Useful for triage and history, not for crisis entry |
+| Watch report filters (agency, time window, lights/sirens) | Helpful for pattern analysis, overwhelming during active response |
+| Meet-a-need categories and urgency levels | Good for organization, bad if required upfront |
+| Warehouse inventory management | Important for logistics, completely separate workflow |
+| Dispatcher schedules/shifts | Administrative task, not crisis response |
+| Role-based visibility controls | Useful for privacy, confusing during emergencies |
+| Pagination and page size controls | Optimization, not core function |
+| Date range pickers | Analysis tool, not dispatch tool |
+
+### Harmful or Intimidating Features
+
+*Increase friction, fear, or false precision.*
+
+| Feature | Why Harmful |
+| --------- | ------------- |
+| **10+ filters visible by default** | Decision paralysis. Users don't know what's "right." |
+| **Multi-step wizard with required fields per step** | Creates checkpoints where users abandon |
+| **Role names like `dispatcher_admin`, `regional_admin`** | Institutional language creates fear of doing it wrong |
+| **"Team Request" framing** | Implies you need to know what kind of team. You don't. |
+| **Required preset selection (scout_check, etc.)** | Forces categorization before understanding |
+| **Visibility dropdowns with 10+ role options** | Users cannot evaluate what visibility means |
+| **665-line meet-a-need page** | Complexity is visible. Intimidation is felt. |
+| **"Confirm" buttons without explanation of consequences** | Fear of irreversibility |
+| **Filter state persisted to localStorage** | Stale filters cause confusion on return |
+
+---
+
+## Feature Gaps
+
+### Missing: High-Leverage Additions
+
+| Gap | Impact |
+| ----- | -------- |
+| **"Quick report" mode** | Single-screen dispatch for experienced users |
+| **Voice note option** | Reduces typing burden under stress |
+| **Draft auto-save** | If user abandons mid-flow, work isn't lost |
+| **"I'm responding" button** | Signal availability without claiming ownership |
+| **Active dispatch count in nav** | "3 active" is less intimidating than a full dashboard |
+| **"Nothing happening right now" empty state** | Prevents panic when list is empty |
+| **Offline-first submission queue** | Dispatch works on subway, in wilderness, etc. |
+
+### Missing: Safeguards
+
+| Gap | Risk |
+| ----- | -------- |
+| **No timeout warning** | User thinks submission worked, but session expired |
+| **No "are you still here?" for stale sessions** | Reports submitted to dead sessions |
+| **No confirmation of notification delivery** | User doesn't know if anyone saw the dispatch |
+| **No escalation if no response in X minutes** | Silent failure when no responders available |
+| **No "mark as false alarm" workflow** | People avoid system because mistakes feel permanent |
+
+### Missing: Visibility Signals
+
+| Gap | Effect |
+| ----- | -------- |
+| **"Report received" toast with timestamp** | User needs to know it worked |
+| **"X people notified" confirmation** | Reassurance that system is alive |
+| **Active responder count** | "2 dispatchers online" reduces isolation |
+| **"Last activity: 3 min ago" on dispatch cards** | Shows momentum, not abandonment |
+| **Progress indicator on forms** | "Step 2 of 4" reduces anxiety about length |
+
+---
+
+## Design Forks: Social and Technical Decisions
+
+> *The report correctly diagnoses feature intimidation, but the next risk is social ambiguity. Most remaining questions are not technical. They are about power, responsibility, and trust under stress.*
+
+These are the design forks that must be resolved explicitly. If left unanswered, responders will invent norms under stress. And those norms will conflict.
+
+**Note:** Detailed specifications for specific subsystems have been moved to their respective documentation pages. See [Navigation](#document-navigation) above.
+
+### Summary of Key Decisions
+
+### Summary of Key Decisions
+
+#### Dispatch Authority and Ownership
+- Anyone involved can close or downgrade a dispatch (logged with reason)
+- Multiple people can act independently - no ownership model
+- "I'm responding" is advisory, not a lock
+- Dispatches don't require reporter presence
+- Closed dispatches have 15-minute reopen window
+
+**Principle:** Coordination emerges from visibility, not from hierarchy.
+
+#### Escalation Logic
+- Auto-escalates after 10 min (geographic widening), 30 min (all users)
+- Visible to reporter with transparent messaging
+- Load-aware caps prevent alert fatigue
+- See [Escalation State Machine](/specs/escalation-state-machine) for full details
+
+**Principle:** Escalation is a safety net, not a failure state.
+
+#### Location Semantics
+- Locations are mutable with audit trail
+- City-block level precision is acceptable
+- Locations can move (last known field)
+- All locations are hypotheses, not truth
+- Conflicting reports shown with attribution
+
+**Principle:** Location is a starting point, not a contract.
+
+#### Urgency Semantics
+- Anyone can change urgency (logged)
+- Urgency is a signal, not a promise
+- Affects notification behavior (critical = immediate, low = feed only)
+- Auto-downgrades after 2 hours without update
+- Always reversible without penalty
+- See [Urgency Model](/specs/urgency-model) for full details
+
+**Principle:** Urgency is mutable and forgiving.
+
+#### Offline and Sync Guarantees
+- Reports persist locally, retry for 24 hours
+- Idempotent by client ID (no duplicates)
+- Offline status visible before submission
+- Manual retry always available
+- See [Offline Guarantees](/specs/offline-guarantees) for full details
+
+**Principle:** Offline must never feel like abandonment.
+
+#### Accountability Without Fear
+- Identity visible to responders, not public
+- No full anonymity, but name can be hidden from non-dispatchers
+- Full edit history for dispatchers
+- False alarms framed as "turned out okay"
+- No automated punishment
+
+**Principle:** Accountability exists for coordination, not for punishment.
+
+#### Feature Removal Risk
+- Power users may feel capability loss - use progressive disclosure
+- Role-based access, schedules, audit logs are politically sensitive
+- Feature-flag all changes with 90-day "classic view" rollback
+- Advanced features unlock after 5 successful dispatches
+
+**Principle:** Simplification is not removal. It's sequencing.
+
+#### Mode Separation Enforcement
+- Crisis mode vs management mode with distinct URLs (`/dispatch/*` vs `/admin/*`)
+- Manual toggle visible in header
+- Warning banner during live crisis if in admin mode
+- Regional admins can enforce "lockdown mode" during major events
+
+**Principle:** Mode bleed is a safety risk.
+
+---
+
+## Success Metrics
+
+| Metric | Target | Measurement |
+| -------- | -------- | ------------- |
+| **Abandonment rate (dispatch form)** | < 15% | % of users who start a dispatch and do not submit |
+| **Time-to-first-dispatch (new users)** | < 90 seconds | Clock starts at form open, ends at submission |
+| **Time-to-first-responder** | < 10 minutes for 80% of dispatches | Time from submission to first "I'm responding" |
+| **Intimidation signals** | Declining trend | Post-dispatch survey: "Did you feel confident using this?" (1-5 scale) |
+| **Failure rate during peak stress** | < 1% submission failures | % of submissions that fail to persist during high-load events |
+| **Escalation trigger rate** | < 30% of dispatches | % of dispatches that require escalation (lower = faster initial response) |
+| **False alarm closure rate** | Tracked, not targeted | "Turned out okay" closures are signal, not failure |
+| **Qualitative feedback** | Collected, not scored | Optional free-text post-dispatch: "Anything we should know?" Anonymous. Reviewed monthly for emotional friction, language misfires, and situations metrics miss. |
+
+**Measurement principle:** If you cannot measure it, you cannot defend it. These metrics should be reviewed monthly and published internally.
+
+---
+
+## Summary of Recommendations
+
+### Immediate Actions (Reduce Harm)
+
+1. Hide all filters by default behind a "Filter" button
+2. Remove required fields from dispatch form except location
+3. Replace role-based visibility labels with human-readable descriptions
+4. Add "This will not break anything" language near submit buttons
+5. Show active responder count in header
+
+### Medium-Term Actions (Add Missing Signals)
+
+1. Implement draft auto-save on all forms
+2. Add "Report received" + "X people notified" confirmation flow
+3. Create "Quick report" single-screen mode
+4. Add offline submission queue with sync indicator
+5. Add escalation alerts when no one responds in 10 minutes
+
+### Long-Term Actions (Redesign Core Flows)
+
+1. Rebuild dispatch creation as minimal flow (see [Minimal Dispatch Flow](/specs/minimal-dispatch-flow))
+2. Separate "administrative" features (schedules, warehouse) from crisis response
+3. Create distinct "crisis mode" and "management mode" UX patterns
+4. User testing with non-technical, first-time users under simulated stress
+
+---
+
+## Closing Note
+
+The complexity exists because the problem *is* complex. But the goal of this review is not to remove features. It is to ensure that **the most important features are the most accessible**, and that **fear of doing it wrong never prevents someone from doing it at all.**
+
+The measure of success is not how many features exist. It is how many people actually use the system when it matters.
+
+---
+
+## Document Status
+
+**Classification:** System Constitution (binding intent)  
+**Version:** 1.0  
+**Invariant Set Version:** 1.0  
+**Last Updated:** 2026-01-14  
+**Review Cycle:** Quarterly, or after any major incident
+
+This document should be treated as policy. Engineers, admins, and responders may cite it in disagreements. That is intentional.
+
+**Precedence:** In case of conflict between this document and implementation details, this document prevails. Implementation that contradicts stated invariants is a bug, not a feature.
+
+**Liability:** This system provides coordination signals, not professional directives. Users act voluntarily and retain responsibility for their own actions. This platform is not a substitute for professional emergency services.
+
+For detailed specifications, see the navigation links at the top of this document.

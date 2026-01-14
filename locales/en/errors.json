@@ -1,0 +1,12 @@
+{
+  "genericError": "Something went wrong",
+  "networkUnavailable": "You are offline",
+  "failedToSend": "This report could not be sent",
+  "retryLater": "Please try again later",
+  "sessionExpired": "Your session expired",
+  "missingLocation": "Location is required",
+  "invalidAddress": "That address could not be found",
+  "permissionDenied": "You do not have access to this",
+  "syncFailed": "Sync failed",
+  "unknownError": "An unexpected error occurred"
+}

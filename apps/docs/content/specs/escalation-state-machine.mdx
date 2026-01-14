@@ -1,0 +1,26 @@
+# Escalation Logic
+
+## Design Forks: Escalation
+
+| Question | Position |
+| ---------- | ---------- |
+| **What is the default escalation path if no one responds?** | After 10 minutes with no "I'm responding" signal, the dispatch widens to the next geographic ring (pod → region → neighboring regions). After 30 minutes, it becomes visible to all authenticated users. |
+| **Who defines the escalation timer?** | System default (10/30 min), overridable by regional admins. Users cannot suppress escalation, but can mark a dispatch as "help is coming" to pause the timer. |
+| **Can escalation notify different groups?** | Yes. Initial alert goes to nearby responders. Escalation goes to dispatcher-on-duty first, then to all regional responders. |
+| **Is escalation visible to the reporter?** | Yes. Reporter sees: "No one has responded yet. We're notifying more people." Transparency reduces panic. |
+| **Can escalation be suppressed?** | Only by a dispatcher-on-duty or regional admin, and only with a logged reason. Suppression is auditable. |
+
+## Load Awareness (Known Risk)
+
+Unbounded escalation during regional events can cause alert fatigue. Mitigations to implement:
+
+- Cap concurrent escalation notifications per user (max 3 active dispatches alerting at once). *Note: Caps apply per user, not system-wide, to avoid one noisy region starving another during simultaneous incidents.*
+- Prefer geographic widening before global broadcast
+- Suppress repeat escalations if adjacent dispatches are already active and staffed
+- During declared events, batch escalations into summaries rather than individual alerts
+
+**Principle:** Escalation is a safety net, not a failure state. It should feel like "the system is working," not "no one cares."
+
+---
+
+**Last Updated:** 2026-01-14

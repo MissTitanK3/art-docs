@@ -1,0 +1,23 @@
+{
+  "reportSomething": "Report something",
+  "sendReport": "Send report",
+  "editReport": "Edit",
+  "cancel": "Cancel",
+  "retry": "Retry",
+  "syncNow": "Sync now",
+  "useMyLocation": "Use my location",
+  "dropPin": "Drop a pin",
+  "typeAddress": "Type an address",
+  "markResponding": "I am responding",
+  "markStillActive": "Still active",
+  "closeDispatch": "Close",
+  "reopenDispatch": "Reopen",
+  "viewDetails": "View details",
+  "goBack": "Go back",
+  "switchToAdmin": "Switch to admin view",
+  "backToDispatch": "Back to dispatch view",
+  "showFilters": "Show filters",
+  "hideFilters": "Hide filters",
+  "showAdvanced": "Show advanced options",
+  "saveDraft": "Save draft"
+}

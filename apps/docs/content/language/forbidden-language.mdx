@@ -1,0 +1,272 @@
+# Forbidden Language
+
+## Institutional and Authority-Encoded Language
+
+The following language patterns create fear, confusion, or imply that expertise is required to proceed. They are explicitly forbidden in crisis-facing interfaces.
+
+---
+
+## Forbidden Terms and Patterns
+
+### Role-Specific Jargon
+
+**Forbidden:**
+- `dispatcher_admin`
+- `regional_admin`
+- `role:authenticated_user`
+- "Required roles"
+- "Authorized personnel only"
+
+**Why:** Implies you need to know organizational structure to use the system.
+
+**Use instead:**
+- "Dispatchers only"
+- "Coordinators can see this"
+- "Who can help"
+- "Only you and dispatchers can see this"
+
+---
+
+### Database and Technical Terms
+
+**Forbidden:**
+- "Validate"
+- "Schema"
+- "Persist"
+- "Entity"
+- "Status: Open"
+- "Priority Level"
+- "Submitted at [timestamp]"
+- "Record updated"
+
+**Why:** Exposes internal system architecture. Users don't care about databases.
+
+**Use instead:**
+- "Check"
+- (Never expose this concept)
+- "Save"
+- "Dispatch," "Report," "Person"
+- "Still needs response"
+- "How urgent"
+- "Sent 3 minutes ago"
+- "Changed by Alex"
+
+---
+
+### Bureaucratic Formality
+
+**Forbidden:**
+- "Submit a request for support"
+- "Intended actions"
+- "Confirm incident classification"
+- "Acknowledge receipt"
+- "Escalation protocol initiated"
+
+**Why:** Creates cognitive distance. Sounds like paperwork, not help.
+
+**Use instead:**
+- "Let people know something's happening"
+- "What needs to happen"
+- "What's going on?"
+- "Got it"
+- "We're notifying more people"
+
+---
+
+### Precision Demands
+
+**Forbidden:**
+- "Enter exact coordinates"
+- "Confirm incident type"
+- "Select category"
+- "Specify threat level"
+- "Define scope"
+
+**Why:** Forces premature categorization. Creates paralysis.
+
+**Use instead:**
+- "Where is this happening?"
+- "What's going on? (A few words is enough)"
+- "Tags (optional)"
+- "How urgent is this?"
+- "Describe what you know"
+
+---
+
+### Blame or Error Language
+
+**Forbidden:**
+- "Invalid input"
+- "Incorrect format"
+- "Failed to submit"
+- "User error"
+- "Access denied"
+- "Unauthorized"
+- "False alarm"
+
+**Why:** Implies user fault. Creates shame and fear.
+
+**Use instead:**
+- "We need this to be in the format: ..."
+- "This needs to look like: ..."
+- "This couldn't be sent. [What happened] [Try again]"
+- "Something went wrong on our end"
+- "You don't have permission to see this"
+- "This area is restricted"
+- "Turned out to be okay"
+
+---
+
+### Ownership and Hierarchy Language
+
+**Forbidden:**
+- "Assigned to"
+- "Your responsibility"
+- "Take ownership"
+- "Claim this dispatch"
+- "Report to [person]"
+- "Chain of command"
+- "Authorization required"
+
+**Why:** Implies hierarchy. This system has no command structure.
+
+**Use instead:**
+- "[Name] is responding"
+- "You can help with this"
+- "I'm heading there"
+- "I'm responding"
+- "Check in with [person]"
+- "Ask [person]"
+- "Only [role] can do this"
+
+---
+
+### Ambiguous Status Language
+
+**Forbidden:**
+- "Pending"
+- "In progress"
+- "Awaiting response"
+- "Under review"
+- "Queued"
+
+**Why:** Doesn't explain what's actually happening. Creates anxiety.
+
+**Use instead:**
+- "We're checking on this"
+- "[Name] is on their way"
+- "No one has responded yet"
+- "[Name] is looking at this"
+- "This will send when you're back online"
+
+---
+
+### Jargon from Emergency Services
+
+**Forbidden:**
+- "10-4"
+- "Signal 13"
+- "Code [anything]"
+- "ETA"
+- "Incident commander"
+- "Scene secure"
+- "Triage priority"
+
+**Why:** This is not professional emergency response. Using professional jargon creates false expectations and intimidates non-professionals.
+
+**Use instead:**
+- "Got it" or "Okay"
+- Plain language description
+- Plain language description
+- "Should be there in [time]"
+- "Coordinating" (if anyone is)
+- "Situation is stable"
+- "How urgent"
+
+---
+
+### ALL CAPS and Excessive Punctuation
+
+**Forbidden:**
+- "URGENT"
+- "EMERGENCY!!!"
+- "IMMEDIATE ACTION REQUIRED"
+- "WARNING!!!"
+
+**Why:** Amplifies panic. The situation is already urgent.
+
+**Use instead:**
+- "Urgent" (regular case)
+- "Emergency" (regular case)
+- "Someone is in danger right now" (clear, factual)
+- "Heads up" or "Important"
+
+---
+
+## Forbidden UI Patterns
+
+### Mystery Buttons
+
+**Forbidden:**
+- [Confirm] (with no explanation)
+- [Submit]
+- [OK]
+- [Proceed]
+
+**Why:** Users don't know what will happen.
+
+**Use instead:**
+- [Send Report] + preview of what's being sent
+- [Close This] + "Anyone can reopen it"
+- [Got it]
+- [Send to 12 people nearby]
+
+---
+
+### Unexplained Wait States
+
+**Forbidden:**
+- "Loading..." (with no context)
+- [Spinner with no text]
+- "Please wait"
+
+**Why:** Silence during wait creates fear that something broke.
+
+**Use instead:**
+- "Checking for open situations..."
+- "Finding people nearby..." (with spinner)
+- "This takes a few seconds. Checking..." 
+
+---
+
+### Implied Permanence
+
+**Forbidden:**
+- "This cannot be undone"
+- "Final submission"
+- "Irreversible action"
+- "Delete forever"
+
+**Why:** Creates fear of making mistakes. Most things should be reversible.
+
+**Use instead:**
+- "You can reopen this later if needed"
+- "Send report" (not "final")
+- "You can undo this for the next 15 minutes"
+- "Remove" + "You can restore this from history"
+
+---
+
+## Testing for Forbidden Language
+
+Before deploying any UI text, check:
+
+1. **Could this appear on a government form?** → Rewrite
+2. **Would a 12-year-old understand this?** → If no, rewrite
+3. **Does this require knowing someone's job title?** → Rewrite
+4. **Does this sound like a database error?** → Rewrite
+5. **Would this make someone hesitate?** → Rewrite
+
+---
+
+**Last Updated:** 2026-01-14
