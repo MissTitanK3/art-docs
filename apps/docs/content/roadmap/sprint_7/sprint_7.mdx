@@ -1,0 +1,362 @@
+# Sprint 7: Operational Guardrails & Auditability
+
+## Executive Summary
+
+**Status:** Kickoff (after Sprint 0-6 completion)  
+**Sprint 0 Blockers:** 🟢 All 6 resolved (B1-B6: API, Schema, Auth, Offline, Regions, Modes)  
+**Sprint 1-6 Blockers:** 🟢 All complete and operational  
+**Sprint 7 Blockers:** Invariant specification finalization (depends on constitution review)  
+
+**Action Items:**
+- [ ] Finalize list of critical invariants from system constitution
+- [ ] Design audit trail format & backend logging endpoint
+- [ ] Plan role-based guardrail enforcement (if applicable)
+
+---
+
+## Sprint Intent
+- Enforce invariants and provide auditability for dispatch changes to ensure trustworthy operations.
+- Instrument key transitions and validations so later automation and reporting can rely on consistent state.
+
+## Objective & Success Definition
+**Objective:** Create verifiable, auditable dispatch operations that maintain system invariants and provide confidence that state transitions are safe and traceable.
+
+**Success is achieved when:**
+- Invalid state transitions are prevented at the UI (with clear user guidance)
+- All dispatch changes are logged with actor, timestamp, and action
+- Audit trail is accessible to authorized users and complete for compliance reviews
+
+## Framing the Unknowns
+- **Invariant Definitions:** Which invariants are critical? How are they versioned or updated?
+- **Audit Trail Format:** Will backend provide audit logs? Client-side only? Both?
+- **User Permissions:** Do different roles have different guardrails (e.g., responders can't close a dispatch)?
+- **Audit Retention:** How long must audit logs be retained? Are they PII-sensitive?
+
+## Primary Risks & Tradeoffs
+**Risks:**
+- Over-strict guardrails could block legitimate edge cases (mitigated by tuning rules with real usage feedback)
+- Client-side guardrails can be bypassed (mitigated by server-side enforcement, client is UX layer only)
+- Audit logs may contain sensitive data (mitigated by redaction and access controls)
+
+**Tradeoffs:**
+- **Strictness vs. Usability:** Strict enforcement prevents mistakes but feels restrictive; loose enforcement is flexible but allows errors
+- **Comprehensive Audit vs. Performance:** Logging everything provides traceability but adds overhead; selective logging is faster but gaps appear later
+
+## Phased Implementation Plan
+**Phase 1 (Invariant Enforcement):**
+- Document all dispatch state invariants (from constitution/specs)
+- Implement client-side validation before each state change
+- Show clear errors if invariants are violated
+
+**Phase 2 (Audit Event Emission):**
+- Identify key events to log (create, update status, responder changes, close)
+- Implement client-side event capture
+- Wire to audit logging endpoint
+
+**Phase 3 (Audit Trail Display):**
+- Query audit metadata from API (if available)
+- Display in dispatch detail view (who changed what, when)
+- Handle missing/incomplete audit gracefully
+
+**Phase 4 (Testing & Documentation):**
+- Test invariant violations and error messages
+- Test audit logging reliability
+- Document all enforced invariants and remediation steps
+
+## Technology Stack
+- **Validation Logic:** Custom validation functions or schema library (Zod, Yup)
+- **Audit Events:** Custom event emitter or analytics library
+- **Logging Transport:** Configurable endpoint (environment-specific via `runtimeConfig`)
+- **State Management:** React hooks or lightweight store to track dispatch state changes
+- **UI Display:** Audit trail component rendering log entries
+- **Testing:** Unit tests for invariant validation; integration tests for event logging
+- **Monitoring:** Telemetry to track invariant violations and audit success rates
+
+## Dependencies
+- **Sprint 0 Complete:** All 6 blockers resolved ([API](/specs/backend-api-contracts), [Schema](/specs/database-schema), [Auth](/specs/authentication-architecture), [Offline](/specs/offline-support-architecture), [Regions](/specs/region-scope-architecture), [Modes](/specs/crisis-management-mode-strategy))
+- **Sprint 1-6 Complete:** All core features and guardrails deployed and operational
+- **System Constitution:** Critical invariants and state rules documented ([System Constitution](/constitution/system-constitution), [Invariants](/constitution/INVARIANTS.md))
+- **Language Guidelines:** Guardrail error messaging patterns available ([Forbidden Language](/language/forbidden-language), [Tone Guidelines](/language/tone-guidelines))
+- **Runtime Config:** API base URL and audit endpoint configured ([Runtime Config](/turbo/apps/web/config/runtime.ts))
+- **Core flows from earlier sprints:** Intake, active view, responder signaling, error handling, offline sync all operational
+
+## Scope and Non-Scope
+- Scope:
+  - Client-side guardrails for critical transitions (e.g., status changes) aligned with backend rules.
+  - Surface audit trail visibility (at least metadata) for dispatch changes.
+  - Validate required invariants before submissions/updates; show clear remediation guidance.
+  - Capture lightweight client-side audit events to complement server logs (non-PII).
+- Non-Scope:
+  - Full compliance dashboards or analytics UIs.
+  - Complex role-based policy engines.
+  - Changing notification semantics beyond what exists.
+
+## Core Deliverables
+- Guardrail checks in UI flows to prevent invalid transitions; errors are explicit and actionable.
+- Audit metadata surfaced in the detail view (who changed what, when) if provided by the API.
+- Client-side audit event emission (configurable endpoint) for key actions.
+- Documentation of enforced invariants and how to remediate violations.
+- Copy consistent with tone/forbidden language guidelines.
+
+## Success Criteria
+- Invalid transitions are blocked with clear guidance; users understand how to proceed.
+- Audit info displays for dispatch changes when available; absence is explicitly noted.
+- Client emits audit/trace events without blocking UI; failures are non-fatal and logged.
+- Invariants are documented and enforced consistently between client and backend.
+
+---
+
+## Backend Team - Concrete Kickoff Tasks
+
+| Phase | Task | Deliverable | Validation |
+|-------|------|-------------|-----------|
+| 1 | Document all critical dispatch state invariants (from constitution) | Invariant spec with conditions, violations, and remediation | Reviewed by product & ops |
+| 1 | Define server-side invariant validation rules | Code implementing validation before state changes | Unit tests covering all invariants |
+| 2 | Design audit log schema (actor, timestamp, action, fields changed, new/old values) | Database schema & audit log endpoint spec | Reviewed by ops & security |
+| 2 | Implement audit logging endpoint (`GET /api/dispatch/{id}/audit-log`) | Working endpoint returning audit events for a dispatch | Integration test suite |
+| 3 | Return audit metadata in dispatch detail API (if PII-safe) | Updated GET endpoint with audit context fields | Tested with frontend integration |
+| 4 | Document invariants & remediation steps for ops/support | Ops runbook with invariant violations, how to fix | Shared with ops & frontend teams |
+
+---
+
+## Frontend Team - Concrete Kickoff Tasks
+
+| Phase | Task | Deliverable | Validation |
+|-------|------|-------------|-----------|
+| 1 | Extract invariants from constitution into code constants/schema | Invariant rules file (Zod, TypeScript types, or config) | Reviewed against constitution document |
+| 1 | Implement pre-submission/update validation logic | Validation functions for all state transitions | Unit tests covering success & violations |
+| 1 | Design guardrail error messages (clear, actionable remediation) | Copy for each invariant violation | Reviewed against language guidelines |
+| 2 | Build event emitter for key audit events (create, update, responder, close) | Event emission code in business logic | Logged to console (for local testing) |
+| 2 | Wire event emitter to audit endpoint | Configurable endpoint for audit events (environment variable) | E2E test: action → event logged |
+| 3 | Create audit trail display component (log list, entry detail) | Timeline/table view of audit events | WCAG 2.1 AA accessible |
+| 3 | Integrate audit display into dispatch detail view | Audit section visible below main dispatch info | Works with missing/partial audit data |
+| 4 | Comprehensive documentation of enforced invariants | Wiki/docs page listing all invariants, how to meet them | Used as support reference |
+
+---
+
+## QA Team - Test Plan with Scenarios per Phase
+
+### Phase 1: Invariant Enforcement
+
+**Scenario 1.1: Invariant Validation on State Change**
+- Action: Attempt to transition dispatch to an invalid state (e.g., close without required responder assigned)
+- Expected: Transition blocked; error message explains the invariant (e.g., "Dispatch requires at least one responder before closing")
+- Automation: State machine test + permission/validation unit tests
+
+**Scenario 1.2: Invariant Remediation Path**
+- Action: Trigger invariant violation; follow guidance to fix
+- Expected: After fixing (e.g., assigning responder), transition succeeds
+- Validation: E2E test: violate → follow remediation → succeed
+
+**Scenario 1.3: Invariant Edge Cases**
+- Action: Test boundary conditions (e.g., empty responder list → add one responder → remove all → error on close)
+- Expected: Invariant enforced consistently in all scenarios
+- Automation: Parameterized test covering edge cases
+
+**Scenario 1.4: Multiple Invariant Violations**
+- Action: Attempt transition violating 2+ invariants simultaneously
+- Expected: All violations reported (or highest-priority first); user sees complete picture
+- Validation: UX review of error presentation
+
+**Scenario 1.5: Permission-Based Guardrails**
+- Action: Attempt action forbidden for user role (if applicable; e.g., responder tries to close dispatch)
+- Expected: Action blocked with role-based message (e.g., "Only coordinator can close")
+- Automation: Permission unit tests + integration tests
+
+### Phase 2: Audit Event Emission
+
+**Scenario 2.1: Event Captured on Create**
+- Action: Create dispatch; check logs
+- Expected: Create event emitted with dispatch ID, creator, timestamp
+- Automation: Spy on event emitter + API call assertion
+
+**Scenario 2.2: Event Captured on Status Update**
+- Action: Update dispatch status (e.g., draft → active); check logs
+- Expected: Update event logged with old/new values, actor, timestamp
+- Automation: Event emission test
+
+**Scenario 2.3: Event Captured on Responder Assignment**
+- Action: Assign responder to dispatch
+- Expected: Responder change event logged with responder ID, assigner, timestamp
+- Automation: Event test
+
+**Scenario 2.4: Event Captured on Dispatch Close**
+- Action: Close dispatch
+- Expected: Close event logged with closer, close reason (if captured), timestamp
+- Automation: Event test
+
+**Scenario 2.5: Event Emission Doesn't Block UI**
+- Action: Trigger action while event emission endpoint is slow/failing
+- Expected: Action completes; user sees success; event logging failure is non-fatal and logged separately
+- Automation: Mock slow endpoint + assert action success independent of event logging
+
+**Scenario 2.6: All Events Reach Backend**
+- Action: Perform 10 actions in sequence; verify all events logged on backend
+- Expected: No dropped events; all 10 logged with correct metadata
+- Automation: Audit log query + event count assertion
+
+### Phase 3: Audit Trail Display
+
+**Scenario 3.1: Audit Timeline Visible**
+- Action: Open dispatch detail view; scroll to audit section
+- Expected: Timeline or table showing all changes with actor, timestamp, action
+- Validation: Visual regression test + screenshot
+
+**Scenario 3.2: Audit Entry Detail**
+- Action: Click audit entry to expand
+- Expected: Shows full details (old value, new value, fields changed, actor name)
+- Automation: DOM interaction + detail rendering test
+
+**Scenario 3.3: Audit Graceful Degradation (No Backend Audit)**
+- Action: API does not return audit log (or endpoint missing); view dispatch
+- Expected: Audit section displays "Audit not available" or similar; doesn't break layout
+- Automation: Test with mocked empty response
+
+**Scenario 3.4: Audit Accessibility**
+- Action: Navigate audit timeline via keyboard; read with screen reader
+- Expected: All entries accessible; proper semantic HTML (table, list, or landmark)
+- Validation: WCAG 2.1 AA audit
+
+**Scenario 3.5: Audit PII Handling**
+- Action: Review audit entry for potentially sensitive data (e.g., user names, notes)
+- Expected: Sensitive fields redacted or visible only to authorized roles (design dependent)
+- Validation: Manual review & ops coordination
+
+### Phase 4: Testing & Documentation
+
+**Scenario 4.1: Invariant Documentation Accuracy**
+- Action: Review ops runbook against actual validation code
+- Expected: Documentation matches implementation; all invariants documented with remediation
+- Validation: Manual docs review + code comparison
+
+**Scenario 4.2: Error Message Clarity**
+- Action: Trigger all guardrail violations; read error messages
+- Expected: Each message is clear, actionable, and uses approved language
+- Automation: Copy audit against language guidelines; manual review
+
+**Scenario 4.3: Comprehensive Invariant Coverage**
+- Action: List all critical dispatch state invariants from constitution; verify each is enforced
+- Expected: 100% of critical invariants have client-side validation + audit trails
+- Validation: Traceability matrix (invariant → code location → tests)
+
+**Scenario 4.4: Audit Reliability E2E**
+- Action: Perform 50 random dispatch actions in sequence; audit entire lifecycle
+- Expected: Audit trail is complete & consistent; no gaps or corruption
+- Automation: Fuzz test with random valid actions + audit completeness check
+
+---
+
+## Documentation Quick Links
+
+| Role | Document | Purpose |
+|------|----------|---------|
+| All | [Backend API Contracts](/specs/backend-api-contracts) | All 14 endpoints; standardized error format |
+| All | [Database Schema](/specs/database-schema) | All 5 tables; versioning for state consistency |
+| All | [System Constitution](/constitution/system-constitution) | Design principles & invariant definitions |
+| All | [Blocker Resolution Index](/specs/BLOCKER-RESOLUTION-INDEX) | All 6 Sprint 0 blockers resolved  |
+| Backend | [Dispatch State Invariants](/constitution/INVARIANTS.md) | All critical invariants & state rules |
+| Backend | [Audit Log Endpoint Spec](/specs/backend-api-contracts) | API contract for audit queries |
+| Frontend | [Client-Side Invariant Checks](./client-invariants.md) | TypeScript types/Zod schema for validation |
+| Frontend | [Guardrail Error Copy](./guardrail-error-messages.md) | Approved messages for invariant violations |
+| Frontend | [Audit Trail Component Guide](./audit-display-guide.md) | How to render & interact with audit logs |
+| QA | [Invariant Test Plan](./sprint-7-test-plan.md) | Detailed invariant & audit test scenarios |
+| Ops | [Invariant Remediation Runbook](./ops-invariant-runbook.md) | How to fix invariant violations |
+| All | [Language Guidelines](/language/tone-guidelines.md) | Copy standards for guardrail messages |
+
+---
+
+## Decision Tracking
+
+| Decision | Owner | Rationale | Status | Last Updated |
+|----------|-------|-----------|--------|--------------|
+| **Sprint 0 Foundations (All Resolved)** | Architecture | Foundation for all sprints | 🟢 | |
+| API Contract | Backend | 14 endpoints finalized | 🟢 | [Complete Spec](/specs/backend-api-contracts) |
+| Database Schema | DB | 5 tables with versioning | 🟢 | [Complete Spec](/specs/database-schema) |
+| Auth Architecture | Security | JWT + 3 roles | 🟢 | [Complete Spec](/specs/authentication-architecture) |
+| Offline Support | Product | Queueing + sync | 🟢 | [Complete Spec](/specs/offline-support-architecture) |
+| Region Scope | Ops | 3 initial US regions | 🟢 | [Complete Spec](/specs/region-scope-architecture) |
+| Crisis/Management Modes | Product | Two-mode UX | 🟢 | [Complete Spec](/specs/crisis-management-mode-strategy) |
+| **Sprint 7 Specific Decisions** | | | | |
+| Critical Invariants List | Product & Ops | Which invariants are non-negotiable vs. advisory | ⏳ | Constitution review |
+| Audit Log Retention Period | Ops & Compliance | Legal/compliance requirements | ⏳ | Ops input |
+| PII Handling in Audit (redaction vs. access control) | Security & Ops | Data sensitivity & privacy | ⏳ | Security review |
+| Role-Based Guardrails (different rules per role) | Product | UX flexibility vs. safety | ⏳ | User research |
+| Audit Display Accessibility (timeline vs. table vs. text) | Frontend Lead | UX clarity & accessibility | ⏳ | Design review |
+
+---
+
+## Common Questions
+
+**Q: Are client-side guardrails enough, or do we need server-side enforcement?**  
+A: Both. Client guardrails provide immediate UX feedback. Server-side validation is required for security and is the source of truth. Client is a convenience layer.
+
+**Q: What if an invalid state somehow reaches the frontend from the API (server bug)?**  
+A: Client displays the state as-is but prevents further invalid transitions. Ops/support escalates to backend team for server-side fix. Audit trail helps diagnose the issue.
+
+**Q: Will audit logs contain user names, contact info, or other PII?**  
+A: Design TBD in Phase 2. Likely: actor is stored as user ID (not name). Notes/free-text fields may need redaction. Sensitive fields visible only to authorized roles (e.g., ops).
+
+**Q: How long do audit logs persist?**  
+A: TBD by ops & compliance. Likely: ≥1 year for standard cases; longer for regulatory/legal holds. Design finalizes in Phase 2.
+
+**Q: Can users undo changes if they violate an invariant?**  
+A: No. Invariants are enforced before submission/update. Once accepted, changes are permanent. "Undo" as a feature is out of scope.
+
+**Q: Who can view the audit trail?**  
+A: TBD by product. Likely: dispatch creators/responders can view their own; coordinators/admins can view all. Design in Phase 3.
+
+---
+
+## Go/No-Go Checklist
+
+- [ ] **Sprint 0 Complete:** All 6 blockers resolved and documented ([Blocker Index](/specs/BLOCKER-RESOLUTION-INDEX))
+- [ ] **Sprint 1-6 Complete:** All core features and pattern library deployed and operational
+- [ ] **Invariants Finalized:** All critical invariants extracted from constitution and documented ([Constitution](/constitution/system-constitution), [Invariants](/constitution/INVARIANTS.md))
+- [ ] **Backend Validation:** Server-side invariant checks implemented and tested
+- [ ] **Audit Schema Designed:** Backend audit log schema, endpoints, and retention policy finalized
+- [ ] **Client Validation Ready:** Zod/TypeScript schema for invariant checks ready for implementation
+- [ ] **Error Copy Reviewed:** All guardrail error messages aligned with language guidelines ([Tone Guidelines](/language/tone-guidelines))
+- [ ] **Audit Component Design:** Audit trail UI design reviewed and accessibility planned
+- [ ] **Role Clarity:** Permission model for guardrails & audit access defined (if role-based)
+- [ ] **Test Infrastructure:** Mock audit endpoints and event emitter spy tools ready
+
+---
+
+## Sprint Timeline
+
+```
+Phase 1 (Invariant Enforcement)
+├─ Task: Backend finalizes invariant spec; frontend extracts to code
+├─ Task: Implement client-side validation logic
+├─ Task: Design guardrail error messages
+└─ Task: Validation testing & edge case discovery
+
+Phase 2 (Audit Event Emission)
+├─ Task: Finalize audit log schema; backend builds endpoint
+├─ Task: Frontend event emitter implementation
+├─ Task: Wire emitter to audit endpoint (all key events)
+└─ Task: Event emission testing & reliability check
+
+Phase 3 (Audit Trail Display)
+├─ Task: Backend audit query endpoint; frontend audit component design
+├─ Task: Implement audit display in dispatch detail view
+├─ Task: Graceful degradation (missing/partial audit)
+└─ Task: Accessibility testing (WCAG 2.1 AA)
+
+Phase 4 (Testing & Documentation)
+├─ Task: Comprehensive invariant & audit test scenarios
+├─ Task: Ops runbook & invariant remediation docs
+├─ Task: Error message copy finalization & audit
+└─ Task: Sprint review, retrospective, & follow-on planning
+```
+
+---
+
+## Follow-On Enablement
+- Reporting and compliance work can consume audit events and trust state transitions.
+- Future automation can hook into guardrails rather than adding ad-hoc checks.
+- Regional deployments inherit the same guardrail patterns with minimal changes.
+
+## Known Gaps or Risks
+- Backend audit support may be limited; ensure UI gracefully handles missing metadata.
+- Overly strict guardrails could block legitimate flows; tune rules with real usage feedback.

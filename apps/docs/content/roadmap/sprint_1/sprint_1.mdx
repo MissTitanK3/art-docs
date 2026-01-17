@@ -1,0 +1,462 @@
+# Sprint 1: Minimal Intake
+
+**Date:** 2026-01-24  
+**Status:**  **READY TO START** (Sprint 0 API deployment complete, all blockers resolved)  
+**Blockers Resolved:** 6 of 6 (All Sprint 0 decisions finalized: API, Schema, Auth, Offline, Regions, Modes)
+
+---
+
+## Executive Summary
+
+Sprint 1 focuses on delivering the minimal intake form, the first critical user touchpoint. Sprint 0 has completed **all 6 critical blockers**, providing:
+
+**Key Status:**
+-  **Backend API endpoints deployed** (POST /dispatches, GET /dispatches)
+-  **Database tables created** (users, dispatches, responders)
+-  **Authentication architecture finalized** (JWT + HttpOnly cookies, 3 core roles)
+-  **Offline support architecture finalized** (Local queuing, exponential backoff, MVP ready)
+-  **Region scope defined** (Multi-region MVP: Portland, Denver, Boston)
+-  **Crisis/Management modes defined** (Two-mode UX, crisis default)
+-  **Frontend intake form design finalized**, ready for build
+
+**Blockers:**
+- None active. All Sprint 0 decisions (B1-B6) are locked in and documented in specs.
+
+**Action Items:**
+- Backend: Finalize dispatch creation endpoint error handling and idempotency verification
+- Frontend: Complete intake form component with language compliance review 
+- QA: Execute form validation test plan and API integration tests 
+
+---
+
+## Sprint Intent
+- Deliver a single-screen intake that captures dispatch intent, location, submitter, and timestamp with clear defaults.
+- Remove blockers so anyone can quickly signal "something is happening" without navigating complex flows.
+
+## Objective & Success Definition
+**Objective:** Provide a frictionless, constitution-compliant entry point for dispatch intake that removes cognitive barriers and establishes the data foundation for all downstream features.
+
+**Success is achieved when:**
+- First-time users can submit a complete dispatch in < 2 minutes without help
+- All user-facing strings comply with approved language patterns
+- Dispatch records contain all required fields for later features (location, intent, submitter, timestamp)
+
+## For Backend Team
+
+### Sprint 1 Kickoff Tasks
+
+#### Phase A: API Finalization
+
+1. **Verify POST /dispatches idempotency**
+   - Reference: [API: POST /dispatches](/specs/backend-api-contracts#post-dispatches)
+   - Task: Ensure duplicate client_id requests return 200 (idempotent) with existing dispatch
+   - Test: Send same client_id twice, verify same dispatch_id returned, no duplicate created
+   - Acceptance: Idempotency verified in staging environment
+
+2. **Implement error responses (400, 422, 500)**
+   - Reference: [API error format](/specs/backend-api-contracts#error-responses)
+   - Task: All error responses match contract (error_code, message, details)
+   - Test: Invalid location → 422, missing body → 400, server error → 500
+   - Acceptance: Error contract verified, all endpoints return standardized format
+
+3. **Add request logging and monitoring**
+   - Task: Log POST /dispatches requests (location, urgency, submitter_id) for monitoring
+   - Task: Alert if error rate > 2% or response time > 5s
+   - Acceptance: Logging and alerting deployed to staging
+
+#### Phase B: Database Hardening
+
+4. **Add database constraints and validation**
+   - Task: Ensure latitude/longitude are within valid ranges (idempotently add constraints)
+   - Task: Ensure required fields cannot be null (location_lat, location_lon, submitter_id)
+   - Acceptance: Invalid data rejected at database layer
+
+5. **Optimize dispatch table queries**
+   - Task: Verify indexes on dispatches (region_id, status, created_at) exist
+   - Task: Test query performance for "GET /dispatches with region filter"
+   - Acceptance: Query returns 1000 records in < 500ms
+
+### Key Decisions (All Sprint 0 Blockers Now Resolved)
+- Auth roles:  Finalized as responder, admin, viewer, form captures submitter_id from session ([Auth Spec](/specs/authentication-architecture))
+- Offline sync:  Finalized: MVP includes offline support, form assumes network for Sprint 1, queuing added Sprint 5 ([Offline Spec](/specs/offline-support-architecture))
+- Region scope:  Finalized: multi-region MVP with 3 initial US regions; form location defaults by region config ([Region Spec](/specs/region-scope-architecture))
+- Modes:  Finalized: intake form operates in Crisis Mode (default); Management Mode for admins only ([Mode Strategy](/specs/crisis-management-mode-strategy))
+
+---
+
+## For Frontend Team
+
+### Sprint 1 Kickoff Tasks
+
+#### Phase A: Form Component Development
+
+1. **Build location input component**
+   - Reference: [Minimal Dispatch Flow - Step 1](/specs/minimal-dispatch-flow#step-1-where)
+   - Task: Create location input (lat/lon OR address entry)
+   - Task: Add map preview (optional; can defer to Sprint 2)
+   - Task: Validate: lat/lon within [-90, 90] / [-180, 180]
+   - Test: Valid coordinates accepted, invalid coordinates rejected with clear error
+   - Acceptance: Component integrates with form, submits location_lat and location_lon
+
+2. **Build description/intent text input**
+   - Reference: [Minimal Dispatch Flow - Step 3](/specs/minimal-dispatch-flow#step-3-whats-happening)
+   - Task: Create free-text input (no character limit)
+   - Task: Add placeholder: "What's going on? (A few words is enough)"
+   - Task: Implement character counter (optional; for future UX iteration)
+   - Test: Long text accepted, special characters handled, validation passes
+   - Acceptance: Component accepts and displays multi-line text
+
+3. **Build urgency selector**
+   - Reference: [Minimal Dispatch Flow - Step 4](/specs/minimal-dispatch-flow#step-4-urgency)
+   - Task: Create three-button urgency selector (low / normal / critical)
+   - Task: Set default to "normal" (Needs help soon)
+   - Task: Add helper text for each option
+   - Test: Each option selectable, default pre-selected, submits correct urgency value
+   - Acceptance: Component submits urgency as integer (1 / 2 / 3)
+
+4. **Build form container and submission flow**
+   - Reference: [API: POST /dispatches](/specs/backend-api-contracts#post-dispatches)
+   - Task: Create intake form page (single screen)
+   - Task: Wire to API endpoint via `runtimeConfig.NEXT_PUBLIC_API_BASE_URL`
+   - Task: Generate client_id (UUID) client-side for idempotency
+   - Task: Submit with POST to `/dispatches`
+   - Test: Form submission succeeds, receives dispatch_id in response
+   - Acceptance: Form successfully posts to backend, stores response
+
+#### Phase B: Language Compliance & UX Polish
+
+5. **Apply constitution-compliant copy**
+   - Reference: [Forbidden Language](/language/forbidden-language)
+   - Reference: [Approved Copy](/language/approved-copy)
+   - Task: Review all labels, buttons, placeholders against forbidden terms
+   - Task: Apply approved copy patterns for reassurance (e.g., "Approximate is fine", "You can adjust this later")
+   - Task: Audit form for accessibility (ARIA labels, focus states, keyboard navigation)
+   - Test: No forbidden terms found, all labels clear and human-readable
+   - Acceptance: Language compliance verified, zero forbidden terms
+
+6. **Implement success and error states**
+   - Task: Show success message after submission (e.g., "Your report is live. X people can see it now.")
+   - Task: Show actionable error messages for validation failures (e.g., "Location is required, try a neighborhood name")
+   - Task: Disable submit button during request; show loading state
+   - Task: Implement retry for network failures
+   - Test: Success state appears, error messages are clear, retry works
+   - Acceptance: User gets clear feedback on all outcomes
+
+### Integration Points (Ready When Backend Confirms)
+- [ ] Confirm API base URL in `runtimeConfig` points to backend deployment
+- [ ] Test form against real API (not mock server)
+- [ ] Verify idempotency: submit same form twice, second returns same dispatch_id
+- [ ] Verify error handling: test 422 (invalid location), 400 (missing body), 500 (server error)
+
+---
+
+## For QA Team
+
+### Sprint 1 Test Plan
+
+#### Form Validation Tests
+
+```
+✓ Location Input
+  ✓ Valid lat/lon (e.g., 40.7128, -74.0060) → accepted
+  ✓ Invalid lat (e.g., 91.0) → rejected with error
+  ✓ Invalid lon (e.g., 200.0) → rejected with error
+  ✓ Missing location → cannot submit (button disabled)
+  ✓ Approximate location (e.g., "Brooklyn") → accepted if implementation supports
+
+✓ Description Input
+  ✓ Empty → accepted (optional per intent)
+  ✓ 500+ characters → accepted (no limit)
+  ✓ Special characters → accepted (tested: é, ü, emojis if allowed)
+  ✓ SQL injection attempts → safe (no raw SQL execution)
+
+✓ Urgency Selection
+  ✓ Default is "normal" (pre-selected on load)
+  ✓ Each option selectable (low, normal, critical)
+  ✓ Pressing each button → correct value in form state
+  ✓ Cannot deselect (always one selected)
+
+✓ Form Submission
+  ✓ All fields filled → POST /dispatches succeeds, returns 201
+  ✓ client_id present in request → verified in server logs
+  ✓ Response contains dispatch_id → can retrieve via GET /dispatches/:id
+  ✓ Submit button disabled during request (no double-submit)
+  ✓ Success state visible → message appears (e.g., "Report is live")
+```
+
+#### API Integration Tests
+
+```
+✓ POST /dispatches Integration
+  ✓ Form data maps correctly to API contract
+  ✓ location_lat, location_lon, description, urgency in payload
+  ✓ submitter_id from session token (auto-captured)
+  ✓ timestamp auto-set server-side
+  ✓ Idempotency: second POST with same client_id → 200 (not 201)
+
+✓ Error Handling
+  ✓ Invalid coordinates (lat > 90) → 422 with error_code="invalid_location"
+  ✓ Missing location → 400 with error_code="missing_field"
+  ✓ Network timeout → user sees "Try again" button, retry succeeds
+  ✓ Server error (500) → user sees clear message, retry available
+
+✓ Success Path
+  ✓ Dispatch persists in database (verify via GET /dispatches)
+  ✓ Dispatch record contains all fields from form
+  ✓ Created timestamp is current (within 1 minute)
+  ✓ Status is "open" (default)
+```
+
+#### Language & Accessibility Tests
+
+```
+✓ Language Compliance
+  ✓ No forbidden terms (no "confirm", "submit", "proceed")
+  ✓ Buttons are clear verbs (e.g., "Send Report")
+  ✓ Error messages are actionable (not "Error" or "Invalid input")
+  ✓ Help text present for each field (e.g., "A few words is enough")
+
+✓ Accessibility
+  ✓ Form has ARIA labels for all inputs
+  ✓ Error messages associated with form fields (aria-describedby)
+  ✓ Keyboard navigation: Tab through all fields and submit button
+  ✓ Focus visible on all interactive elements
+  ✓ No color-only error indication (icon or text required)
+```
+
+---
+
+## Framing the Unknowns
+- **API Contract:** Will the dispatch creation endpoint be stable before this sprint starts, or will it evolve during?
+- **Location Input Method:** Should location be GPS, map-based, address entry, or all three? Which is primary?
+- **Submitter Capture:** How is submitter identified—automatically from session, or explicitly entered?
+- **Defaults & Assumptions:** What are safe defaults for each field? Do they vary by region or user role?
+
+## Primary Risks & Tradeoffs
+**Risks:**
+- If API contract changes mid-sprint, form structure breaks (mitigated by isolating request construction)
+- Location entry confusion could cause users to enter wrong place (mitigated by clear field help text)
+- Silent submission failures leave users uncertain whether dispatch was recorded (mitigated by explicit success state)
+
+**Tradeoffs:**
+- **Simplicity vs. Flexibility:** Single form is simple but can't adapt to different dispatch types; multi-step form would handle more cases but increases cognitive load
+- **Mandatory vs. Optional:** Requiring location provides data completeness but may block rapid submissions; making it optional speeds entry but downstream features may lack critical data
+
+## Phased Implementation Plan
+**Phase 1 (Form Structure):**
+- Design and build form component with required fields (intent, location, submitter auto-capture)
+- Apply sensible defaults (current timestamp, user from session)
+- Implement input validation and inline error states
+
+**Phase 2 (Language & UX):**
+- Review all labels, buttons, placeholders against approved copy patterns
+- Add helper text and reassurance messages
+- Verify zero forbidden terms
+
+**Phase 3 (API Integration & Testing):**
+- Wire form to dispatch creation endpoint via `runtimeConfig`
+- Test success/failure paths
+- Verify submission produces records with expected shape
+
+## Technology Stack
+- **Framework:** React (Next.js `app/` directory)
+- **Form State:** React hooks (e.g., `useState`, or lightweight form library like `react-hook-form`)
+- **Validation:** Client-side validation (library or custom), with clear inline errors
+- **Styling:** CSS modules or Tailwind (aligned with existing `@repo/ui` patterns)
+- **API Communication:** Fetch or axios, using `runtimeConfig` for base URL
+- **Storage (Phase 2 preparation):** Prepare for local storage (draft autosave in Sprint 4)
+## Dependencies
+- Sprint 0 config and environment setup (domains/APIs/regions present in runtime config).
+- Constitution and language guidelines referenced in `apps/docs/content/index.mdx`.
+- Any API contract for creating a dispatch record (baseline endpoint available).
+
+## Scope and Non-Scope
+- Scope:
+  - Build the minimal intake screen (form) with required fields: intent/description, location, submitter, timestamp (auto).
+  - Apply default values and sensible error states; no multi-step flow.
+  - Persist dispatch via the configured API base URL.
+  - Surface basic submission success/failure states.
+- Non-Scope:
+  - Notifications or responder signaling (handled in later sprints).
+  - Advanced filtering or history views.
+  - Offline queueing or retry (later sprint).
+
+## Core Deliverables
+- A working intake page (single screen) that posts to the dispatch creation endpoint.
+- Input validation with clear inline errors and safe defaults (e.g., current timestamp).
+- **UX copy aligned with tone/forbidden language guidelines** (labels, buttons, helper text checked against `/language/approved-copy` and `/language/forbidden-language`).
+- Basic success/failed submission states (visible to the user).
+- Wiring to `runtimeConfig` for API calls (no hard-coded endpoints).
+- **Language checkpoint**: All user-facing strings reviewed against forbidden terms; approved patterns documented for reuse.
+
+## Success Criteria
+- Form submits successfully against the configured API; failures show actionable error messaging.
+- Required fields cannot be bypassed; defaults are applied where appropriate.
+- No navigation or multi-step flow needed to submit a dispatch.
+- **Language compliance**: All labels, buttons, helper text, and error messages use approved copy patterns; zero forbidden terms present (verified against `/language/forbidden-language`).
+
+## Follow-On Enablement
+- Sprint 2 can list active dispatches assuming intake records exist with consistent fields.
+- Notification work can rely on the existence of submitter/location/timestamp data.
+- Future copy changes inherit the tone and constraint patterns established here.
+
+## Known Gaps or Risks
+- API contract changes could affect payload shape; keep request construction isolated for quick updates.
+- Location capture may vary by region; ensure fields can adapt to region-specific requirements defined in config.
+
+---
+
+## Documentation Quick Links
+
+### Implementation Guides
+
+| Role | Key Document | Purpose |
+|------|--------------|---------|
+| Backend | [Backend API Contracts](/specs/backend-api-contracts) | POST /dispatches endpoint details |
+| Backend | [Database Schema](/specs/database-schema) | Dispatch table schema and constraints |
+| Frontend | [Minimal Dispatch Flow](/specs/minimal-dispatch-flow) | UX flow for intake form steps |
+| Frontend | [Forbidden Language](/language/forbidden-language) | Terms and patterns to avoid in UI |
+| Frontend | [Approved Copy](/language/approved-copy) | Recommended language patterns |
+| QA | [API Contracts Summary](/specs/api-contracts-summary) | Error response format and status codes |
+| All | [System Constitution](/constitution/system-constitution) | Design principles for dispatch simplification |
+
+---
+
+## Decision Tracking
+
+| Decision | Status | Owner | Details |
+|----------|--------|-------|---------|
+| API contract stable | 🟢 | Backend Lead | POST /dispatches finalized in Sprint 0 ([API Spec](/specs/backend-api-contracts)) |
+| Location input method | 🟢 | Frontend Lead | Supports GPS, address, map-based input per region ([Minimal Dispatch Flow](/specs/minimal-dispatch-flow)) |
+| Submitter capture auto vs. explicit | 🟢 | Backend Lead | Auto-captured from session with auth architecture ([Auth Spec](/specs/authentication-architecture)) |
+| Error message format | 🟢 | Backend Lead | Standardized contract in B1 spec ([Backend API](/specs/backend-api-contracts#error-response-format)) |
+| Language compliance review | 🟢 | Design Lead | All approved copy patterns available ([Language Guidelines](/language/approved-copy), [Forbidden Terms](/language/forbidden-language)) |
+| Accessibility testing scope | 🟢 | QA Lead | WCAG 2.1 AA level; form validation and error states covered |
+| Offline queueing impact on form | 🟢 | Product Lead | Offline support finalized; intake form assumes network available, Sprint 5 adds queuing ([Offline Spec](/specs/offline-support-architecture)) |
+| Auth roles impact on intake | 🟢 | Security Lead | Three core roles defined; intake form captures submitter_id from session ([Auth Spec](/specs/authentication-architecture)) |
+| Multi-region impact on form | 🟢 | Ops Lead | Three initial regions (Portland, Denver, Boston); form location defaults by region config ([Region Spec](/specs/region-scope-architecture)) |
+| Crisis vs. Management mode impact | 🟢 | Product Lead | Intake form in Crisis Mode (default); Management Mode for config only ([Mode Strategy](/specs/crisis-management-mode-strategy)) |
+
+---
+
+## Common Questions
+
+### Q: Can we start intake form coding now?
+
+**A:** YES. Backend has deployed POST /dispatches and database is ready. Frontend can build the form and integrate with real API by end of first week. No blockers.
+
+### Q: What if users don't know their exact coordinates?
+
+**A:** The form should accept approximate location (e.g., neighborhood name, address). Decision on primary input method (GPS vs. address vs. map) due Jan 25. Form will support the chosen method + fallback.
+
+### Q: How do we prevent form double-submission?
+
+**A:** Use client_id (UUID generated on client) for idempotency. Send same client_id if user submits twice, backend returns same dispatch_id, no duplicate created.
+
+### Q: What if the network fails mid-submission?
+
+**A:** Form retains data in local component state. User sees error message with "Retry" button. Clicking retry resends same request with same client_id (idempotent).
+
+### Q: Does the intake form need to work offline?
+
+**A:** NO. Offline queueing is handled in Sprint 5. Intake form assumes network is available. Graceful error handling if network drops is sufficient.
+
+### Q: How do we verify all copy is compliant?
+
+**A:** Before merge, audit all user-facing strings against `/language/forbidden-language` (search for forbidden terms) and `/language/approved-copy` (verify positive patterns used). QA will execute this audit.
+
+### Q: Can we show urgency presets to help users decide?
+
+**A:** YES. The [Minimal Dispatch Flow](/specs/minimal-dispatch-flow) includes three urgency buttons with descriptive labels:
+- "They're okay for now" (low)
+- "Needs help soon" (normal)
+- "Someone is in danger right now" (critical)
+
+These labels are human-readable and avoid jargon.
+
+---
+
+## Go/No-Go Checklist
+
+| Item | Status | Blocker? |
+|------|--------|----------|
+| Backend API deployed to staging |  YES | ❌ NO |
+| Database tables created |  YES | ❌ NO |
+| API error format documented |  YES | ❌ NO |
+| Design finalized for intake form |  YES | ❌ NO |
+| Auth architecture finalized |  YES | ❌ NO |
+| Offline support finalized |  YES | ❌ NO |
+| Region scope finalized |  YES | ❌ NO |
+| Crisis/Management modes finalized |  YES | ❌ NO |
+| Constitution compliance reviewed |  YES | ❌ NO |
+| Accessibility requirements defined |  YES |  YES (for release) |
+| Test plan ready |  YES | ❌ NO |
+
+**Go Decision:**  **FULL GO FOR SPRINT 1** (all decisions locked, no blockers)
+
+---
+
+## Sprint Timeline
+
+```
+Phase A
+├─ Backend: Finalize error handling and idempotency
+├─ Frontend: Build location + description + urgency components
+├─ Frontend: Build form container and submission logic
+└─ QA: Prepare test plans and mock data
+
+Phase B
+├─ Frontend: Integrate form with real API
+├─ Frontend: Language compliance review (zero forbidden terms)
+├─ Backend: Deploy monitoring and alerting
+├─ QA: Execute form validation tests
+├─ QA: Execute API integration tests
+└─ QA: Execute language compliance audit
+
+Phase C
+├─ Frontend: Accessibility audit (WCAG 2.1 AA)
+├─ QA: Execute accessibility tests
+├─ All: Final release checklist
+└─ Release: Deploy to staging for user testing
+
+Success Criteria Met:
+├─ First-time user can submit dispatch in < 2 minutes
+├─ All copy uses approved language, zero forbidden terms
+├─ Dispatch records persist with all required fields
+├─ Form works against real API, handles errors gracefully
+└─ Ready for Sprint 2 (dispatch listing)
+```
+
+---
+
+## Success Criteria (Sprint 1 End)
+
+ **Frontend Complete:**
+- [ ] Intake form built and tested locally with mock API
+- [ ] Integrated with real backend API (post-Sprint 0 deployment)
+- [ ] All fields validate correctly (location, description, urgency)
+- [ ] Success state shows dispatch confirmation
+- [ ] Error states are clear and actionable
+- [ ] Zero forbidden terms; all copy approved
+- [ ] Accessibility audit passed (WCAG 2.1 AA)
+- [ ] First-time user completes dispatch in < 2 minutes
+
+ **Backend Complete:**
+- [ ] POST /dispatches endpoint error handling finalized
+- [ ] Idempotency verified (duplicate client_id → 200, same dispatch_id)
+- [ ] Request logging deployed
+- [ ] Monitoring and alerting in place
+- [ ] API deployed to staging; available for testing
+
+ **QA Complete:**
+- [ ] Form validation tests pass (all scenarios)
+- [ ] API integration tests pass (success + error paths)
+- [ ] Language compliance audit complete (zero forbidden terms)
+- [ ] Accessibility testing complete (WCAG 2.1 AA)
+- [ ] Integration tests green
+
+---
+
+**Next Update:** 2026-02-01 (after Sprint 1 completion or mid-sprint check-in)
+
+**Current Status:** 🟢 **FULL GO** → Sprint 1 begins with all blockers resolved

@@ -1,0 +1,914 @@
+# Backend API Contracts - MVP Specification
+
+**Status:** 🟢 **ACTIVE**  
+**Version:** 1.0  
+**Last Updated:** 2026-01-17  
+**Owner:** Backend/Platform Team  
+**Deadline:** Pre-Sprint 0 Implementation  
+
+---
+
+## Overview
+
+This document specifies all backend API contracts required for MVP (Sprints 0-4). These endpoints form the contract between the frontend and backend systems.
+
+**Key Principles:**
+- All endpoints require authentication except where explicitly marked `PUBLIC`
+- Timestamps are ISO 8601 UTC (e.g., `2026-01-17T14:32:00Z`)
+- Location coordinates are always `[latitude, longitude]` decimals
+- All errors return standardized error response format
+- Pagination uses cursor-based strategy (backward compatible, suitable for real-time data)
+- Idempotent operations use `client_id` for deduplication
+
+---
+
+## Authentication & Session Management
+
+### Overview
+
+**Decision:** JWT tokens + HttpOnly secure cookies for session persistence.
+
+- **Token Expiry:** 1 hour
+- **Refresh Strategy:** Automatic refresh on `/auth/session` endpoint (before expiry)
+- **Storage:** HttpOnly secure cookie (server-managed); no localStorage exposure
+- **Multi-Region:** Single global auth, but user profile includes `allowed_regions[]`
+
+---
+
+### POST /auth/login
+
+Submit credentials and receive session token.
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** None (public endpoint)
+
+**Request Body:**
+```json
+{
+  "email": "responder@example.com",
+  "password": "secure_password",
+  "region_id": "us-east-1"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "user_id": "usr_abc123",
+  "email": "responder@example.com",
+  "role": "responder",
+  "regions": ["us-east-1"],
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "expires_at": "2026-01-17T15:32:00Z",
+  "created_at": "2026-01-17T14:32:00Z"
+}
+```
+
+**Headers Set by Server:**
+```
+Set-Cookie: session=eyJhbGciOiJIUzI1NiIs...; HttpOnly; Secure; SameSite=Strict; Max-Age=3600
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid email/password format
+- `401 Unauthorized`: Credentials incorrect
+- `403 Forbidden`: User not authorized for requested region
+
+---
+
+### POST /auth/logout
+
+Revoke session and clear cookie.
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token)
+
+**Request Body:**
+```json
+{}
+```
+
+**Response (204 No Content):**
+(Empty response)
+
+**Headers Set by Server:**
+```
+Set-Cookie: session=; Max-Age=0
+```
+
+---
+
+### GET /auth/session
+
+Check session health and refresh token if needed.
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token)
+
+**Query Parameters:**
+```
+None
+```
+
+**Response (200 OK):**
+```json
+{
+  "user_id": "usr_abc123",
+  "email": "responder@example.com",
+  "role": "responder",
+  "regions": ["us-east-1"],
+  "token": "eyJhbGciOiJIUzI1NiIs..." (new token if expired soon)
+  "expires_at": "2026-01-17T15:32:00Z"
+}
+```
+
+**Usage:**
+- Call periodically (e.g., every 15 min) to keep session alive
+- If token is expiring within 5 min, server returns a new token
+- Front-end should update stored token if `token` field is present in response
+
+---
+
+## Dispatch CRUD Operations
+
+### POST /dispatches
+
+Create a new dispatch (submit a report).
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token) OR Public (unauthenticated users can create if allowed by region config)
+
+**Request Body:**
+```json
+{
+  "client_id": "client_xyz789",
+  "location": {
+    "latitude": 40.7128,
+    "longitude": -74.0060,
+    "description": "Corner of 5th and Main",
+    "precision": "block"
+  },
+  "description": "Person collapsed on sidewalk",
+  "urgency": "critical",
+  "submitter_id": "usr_abc123",
+  "tags": ["medical", "public-space"]
+}
+```
+
+**Field Details:**
+
+| Field | Type | Required | Default | Rules |
+|-------|------|----------|---------|-------|
+| `client_id` | string |  YES | N/A | UUID; used for idempotency. If same `client_id` submitted twice, returns 200 with existing dispatch (no duplicate). |
+| `location.latitude` | number |  YES | N/A | Decimal, range [-90, 90], precision up to 6 decimals (≈0.1m) |
+| `location.longitude` | number |  YES | N/A | Decimal, range [-180, 180], precision up to 6 decimals |
+| `location.description` | string | ❌ NO | "" | Free text, max 256 chars. Examples: "near park", "building corner", "intersection" |
+| `location.precision` | enum | ❌ NO | "approximate" | Values: `exact`, `block`, `neighborhood`, `city` |
+| `description` | string | ❌ NO | "" | Free text, max 2000 chars. Plain language, not technical. |
+| `urgency` | enum | ❌ NO | "normal" | Values: `low`, `normal`, `critical` |
+| `submitter_id` | string | ❌ NO (auto) | From JWT | Responder/user ID; auto-populated from auth if not provided |
+| `tags` | array | ❌ NO | [] | String array, max 5 tags, each max 50 chars. No required tags; system can add auto-tags (e.g., region). |
+
+**Response (201 Created):**
+```json
+{
+  "dispatch_id": "dsp_abc123",
+  "client_id": "client_xyz789",
+  "location": {
+    "latitude": 40.7128,
+    "longitude": -74.0060,
+    "description": "Corner of 5th and Main",
+    "precision": "block",
+    "last_updated_by": "usr_abc123",
+    "last_updated_at": "2026-01-17T14:32:00Z"
+  },
+  "description": "Person collapsed on sidewalk",
+  "urgency": "critical",
+  "status": "open",
+  "submitter_id": "usr_abc123",
+  "submitter_name": "Alex",
+  "tags": ["medical", "public-space"],
+  "responders": [],
+  "responder_count": 0,
+  "created_at": "2026-01-17T14:32:00Z",
+  "updated_at": "2026-01-17T14:32:00Z",
+  "closed_at": null,
+  "version": 1
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid location or payload
+- `401 Unauthorized`: Not authenticated (if required)
+- `409 Conflict`: Duplicate `client_id` with different payload (idempotency conflict)
+- `422 Unprocessable Entity`: Validation failed (e.g., location outside service region)
+
+---
+
+### GET /dispatches
+
+List active dispatches visible to user.
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token) OR Public (read-only, no PII)
+
+**Query Parameters:**
+```
+?status=open,acknowledged
+&urgency=critical,normal
+&region=us-east-1
+&limit=50
+&cursor=dsp_xyz789
+&include_closed=false
+```
+
+| Parameter | Type | Required | Default | Rules |
+|-----------|------|----------|---------|-------|
+| `status` | enum[] | ❌ NO | "open,acknowledged" | Comma-separated. Values: `open`, `acknowledged`, `closed`, `reopened`, `escalated` |
+| `urgency` | enum[] | ❌ NO | All | Comma-separated. Values: `low`, `normal`, `critical` |
+| `region` | string | ❌ NO | From user region | Region ID |
+| `limit` | integer | ❌ NO | 50 | Max 100. Pagination page size. |
+| `cursor` | string | ❌ NO | Null (start) | Opaque cursor from previous response's `next_cursor`. |
+| `include_closed` | boolean | ❌ NO | false | Include closed/resolved dispatches. |
+
+**Response (200 OK):**
+```json
+{
+  "dispatches": [
+    {
+      "dispatch_id": "dsp_abc123",
+      "location": {
+        "latitude": 40.7128,
+        "longitude": -74.0060,
+        "description": "Corner of 5th and Main",
+        "precision": "block"
+      },
+      "description": "Person collapsed on sidewalk",
+      "urgency": "critical",
+      "status": "open",
+      "submitter_id": "usr_abc123",
+      "submitter_name": "Alex",
+      "responder_count": 2,
+      "created_at": "2026-01-17T14:32:00Z",
+      "updated_at": "2026-01-17T14:45:00Z",
+      "last_activity": "2026-01-17T14:45:00Z"
+    }
+  ],
+  "next_cursor": "dsp_xyz789",
+  "has_more": true
+}
+```
+
+**PII Redaction (Unauthenticated):**
+- If user is NOT authenticated:
+  - `submitter_name` → Generic (e.g., "Anonymous responder")
+  - `submitter_id` → Omitted
+  - Other fields: visible
+
+---
+
+### GET /dispatches/:dispatch_id
+
+Fetch dispatch detail by ID.
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token) OR Public (read-only)
+
+**URL Parameters:**
+```
+dispatch_id: string (required, e.g., "dsp_abc123")
+```
+
+**Response (200 OK):**
+```json
+{
+  "dispatch_id": "dsp_abc123",
+  "location": {
+    "latitude": 40.7128,
+    "longitude": -74.0060,
+    "description": "Corner of 5th and Main",
+    "precision": "block",
+    "last_updated_by": "usr_abc123",
+    "last_updated_at": "2026-01-17T14:32:00Z"
+  },
+  "description": "Person collapsed on sidewalk",
+  "urgency": "critical",
+  "status": "open",
+  "submitter_id": "usr_abc123",
+  "submitter_name": "Alex",
+  "tags": ["medical", "public-space"],
+  "responders": [
+    {
+      "responder_id": "usr_xyz789",
+      "responder_name": "Jordan",
+      "status": "responding",
+      "claimed_at": "2026-01-17T14:35:00Z"
+    }
+  ],
+  "responder_count": 1,
+  "created_at": "2026-01-17T14:32:00Z",
+  "updated_at": "2026-01-17T14:35:00Z",
+  "closed_at": null,
+  "closure_reason": null,
+  "version": 2
+}
+```
+
+**Error Responses:**
+- `404 Not Found`: Dispatch does not exist
+- `403 Forbidden`: User not authorized to view this dispatch
+
+---
+
+### PATCH /dispatches/:dispatch_id
+
+Update dispatch (location, urgency, description, or status).
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token)
+
+**Request Body (partial update):**
+```json
+{
+  "location": {
+    "latitude": 40.7128,
+    "longitude": -74.0060,
+    "description": "Moved to hospital entrance",
+    "precision": "exact"
+  },
+  "urgency": "normal",
+  "description": "Updated: Person is conscious now",
+  "status": "acknowledged"
+}
+```
+
+**All fields in update body are optional. Only modified fields are updated.**
+
+**Response (200 OK):**
+```json
+{
+  "dispatch_id": "dsp_abc123",
+  "location": { ... },
+  "description": "Updated: Person is conscious now",
+  "urgency": "normal",
+  "status": "acknowledged",
+  "updated_at": "2026-01-17T14:50:00Z",
+  "version": 3
+}
+```
+
+**Authorization Rules:**
+- Submitter can always update their own dispatch
+- Any responder can update location, urgency
+- Status changes ("closed", "reopened") can be done by anyone (logged)
+- Soft delete: status = "closed" is not hard delete; records persist for audit
+
+**Error Responses:**
+- `400 Bad Request`: Invalid field values
+- `403 Forbidden`: User not authorized to edit
+- `404 Not Found`: Dispatch does not exist
+- `409 Conflict`: Version mismatch (see versioning below)
+
+---
+
+### DELETE /dispatches/:dispatch_id (Soft Delete via Status)
+
+**Status:** 🟠 **NOT A REAL DELETE** - Use PATCH to set `status: "closed"`
+
+Instead of HTTP DELETE, close dispatches by:
+```bash
+PATCH /dispatches/:dispatch_id
+{
+  "status": "closed",
+  "closure_reason": "turned_out_okay"
+}
+```
+
+**Closure Reasons (Enum):**
+- `turned_out_okay`: False alarm / self-resolved
+- `help_arrived`: Professional responders arrived
+- `unable_to_help`: Situation resolved without intervention
+- `duplicate`: Duplicate of another dispatch
+- `administrative`: Closed by admin (rare)
+
+**All closures are logged with actor and timestamp for accountability.**
+
+---
+
+## Responder Signaling
+
+### POST /dispatches/:dispatch_id/respond
+
+Signal "I'm responding" to a dispatch.
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token)
+
+**Request Body:**
+```json
+{
+  "status": "responding",
+  "client_id": "response_id_789"
+}
+```
+
+| Field | Type | Required | Rules |
+|-------|------|----------|-------|
+| `status` | enum |  YES | Values: `responding`, `arrived`, `assisting`, `cleared` |
+| `client_id` | string |  YES | UUID for idempotency |
+
+**Response (200 OK or 201 Created):**
+```json
+{
+  "responder_entry_id": "resp_123",
+  "dispatch_id": "dsp_abc123",
+  "responder_id": "usr_xyz789",
+  "responder_name": "Jordan",
+  "status": "responding",
+  "claimed_at": "2026-01-17T14:35:00Z",
+  "dispatch_responders_count": 1,
+  "dispatch_status_changed_to": null,
+  "escalation_paused": false
+}
+```
+
+**Side Effects:**
+- First "responding" for a new dispatch may automatically:
+  - Pause escalation timer (if applicable)
+  - Notify submitter: "Someone is on the way"
+  - Update dispatch status from "open" to "acknowledged" (automatic)
+- Multiple responders can claim same dispatch (no "checkout" model)
+- Idempotent: same `client_id` returns 200, same responder/dispatch again returns 200
+
+**Error Responses:**
+- `404 Not Found`: Dispatch does not exist
+- `409 Conflict`: Dispatch is closed (cannot respond to closed dispatch)
+
+---
+
+### PATCH /dispatches/:dispatch_id/respond/:responder_id
+
+Update responder status (e.g., "arrived").
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token)
+
+**Request Body:**
+```json
+{
+  "status": "arrived"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "responder_entry_id": "resp_123",
+  "status": "arrived",
+  "updated_at": "2026-01-17T14:40:00Z"
+}
+```
+
+**Valid Status Transitions:**
+- `responding` → `arrived` → `assisting` → `cleared`
+- `*` → `cleared` (from any state, to finalize)
+- Backward transitions logged as anomalies but allowed
+
+---
+
+### GET /dispatches/:dispatch_id/responders
+
+List all responders for a dispatch.
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token)
+
+**Response (200 OK):**
+```json
+{
+  "responders": [
+    {
+      "responder_id": "usr_xyz789",
+      "responder_name": "Jordan",
+      "status": "arrived",
+      "claimed_at": "2026-01-17T14:35:00Z",
+      "updated_at": "2026-01-17T14:40:00Z"
+    },
+    {
+      "responder_id": "usr_abc456",
+      "responder_name": "Morgan",
+      "status": "responding",
+      "claimed_at": "2026-01-17T14:36:00Z",
+      "updated_at": "2026-01-17T14:36:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## Notifications
+
+### Overview
+
+**Decision:** Server-sent events (SSE) for real-time push notifications.
+
+Backend maintains active SSE connection per user. Clients connect on app launch and listen for events. No client action required; system sends events automatically based on dispatch changes.
+
+---
+
+### GET /notifications/stream (Server-Sent Events)
+
+Establish real-time connection for notifications.
+
+**Status:** 🟢 **REQUIRED FOR MVP**
+
+**Authentication:** Required (JWT token in query or header)
+
+**Connection:**
+```bash
+GET /notifications/stream?region=us-east-1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Accept: text/event-stream
+```
+
+**Response Headers:**
+```
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+```
+
+**Event Stream Format (Server → Client):**
+
+Each event is a JSON payload prefixed with `data:`. Examples:
+
+```
+data: {"type":"dispatch_created","dispatch_id":"dsp_abc123","urgency":"critical","location":{...},"submitter_name":"Alex","timestamp":"2026-01-17T14:32:00Z"}
+
+data: {"type":"responder_joined","dispatch_id":"dsp_abc123","responder_name":"Jordan","responder_count":1,"timestamp":"2026-01-17T14:35:00Z"}
+
+data: {"type":"dispatch_escalated","dispatch_id":"dsp_abc123","urgency":"critical","message":"No one has responded. We're notifying more people.","timestamp":"2026-01-17T14:42:00Z"}
+
+data: {"type":"dispatch_closed","dispatch_id":"dsp_abc123","closure_reason":"help_arrived","timestamp":"2026-01-17T14:55:00Z"}
+
+data: {"type":"keep_alive","timestamp":"2026-01-17T15:00:00Z"}
+```
+
+**Event Types:**
+
+| Type | Trigger | Payload |
+|------|---------|---------|
+| `dispatch_created` | New dispatch submitted | `dispatch_id`, `urgency`, `location`, `submitter_name`, `timestamp` |
+| `responder_joined` | Someone signals "responding" | `dispatch_id`, `responder_name`, `responder_count`, `timestamp` |
+| `dispatch_escalated` | Auto-escalation triggered (10 min no response) | `dispatch_id`, `urgency`, `message`, `escalation_level`, `timestamp` |
+| `dispatch_closed` | Dispatch marked closed | `dispatch_id`, `closure_reason`, `timestamp` |
+| `dispatch_updated` | Urgency or location changed | `dispatch_id`, `changed_fields[]`, `timestamp` |
+| `keep_alive` | Server heartbeat (every 30 sec) | `timestamp` |
+
+**Client Implementation Notes:**
+- Connection is long-lived; keep open across app lifecycle
+- Reconnect with exponential backoff on disconnect (1s, 2s, 4s, 8s, max 60s)
+- Last `keep_alive` timestamp can be used to detect stale connections
+- Filter events by `region` server-side or client-side
+
+---
+
+## Error Response Format
+
+All error responses follow this standard format:
+
+**Response (4xx or 5xx):**
+```json
+{
+  "error": {
+    "code": "INVALID_LOCATION",
+    "message": "Location precision must be one of: exact, block, neighborhood, city",
+    "details": {
+      "field": "location.precision",
+      "provided": "building",
+      "valid_values": ["exact", "block", "neighborhood", "city"]
+    },
+    "request_id": "req_abc123",
+    "timestamp": "2026-01-17T14:32:00Z"
+  }
+}
+```
+
+**Standard HTTP Status Codes:**
+
+| Code | Meaning | When Used |
+|------|---------|-----------|
+| `400` | Bad Request | Malformed payload, invalid field values |
+| `401` | Unauthorized | Missing or invalid authentication token |
+| `403` | Forbidden | User not authorized for resource |
+| `404` | Not Found | Resource does not exist |
+| `409` | Conflict | Idempotency conflict, version mismatch, state conflict |
+| `422` | Unprocessable Entity | Validation failed (e.g., location outside service region) |
+| `429` | Too Many Requests | Rate limit exceeded |
+| `500` | Internal Server Error | Unexpected backend error |
+| `503` | Service Unavailable | Maintenance or overload |
+
+---
+
+## Pagination & Cursors
+
+**Strategy:** Cursor-based pagination (not offset-based).
+
+**Why Cursor-Based:**
+- Real-time data changes between requests; offset is unreliable
+- Dispatches are added constantly; cursor ensures stable page boundaries
+- Backward-compatible: can use same cursor across multiple requests
+
+**Implementation:**
+
+1. Client calls: `GET /dispatches?limit=50`
+2. Server returns: `{"dispatches":[...], "next_cursor":"dsp_xyz789", "has_more":true}`
+3. Client stores `next_cursor`
+4. For next page: `GET /dispatches?limit=50&cursor=dsp_xyz789`
+5. Repeat until `has_more=false`
+
+**Cursor Format:**
+- Opaque string (do not parse client-side)
+- Safe to URL-encode (no special chars)
+- Expires after 24 hours (client should refresh from beginning if stale)
+
+---
+
+## Versioning & Conflict Resolution
+
+**Optimistic Locking:**
+
+Every dispatch record has a `version` field. When updating, client includes the version it read:
+
+```bash
+PATCH /dispatches/dsp_abc123
+{
+  "urgency": "low",
+  "version": 2
+}
+```
+
+**Server Actions:**
+- If `version` matches: Update succeeds, returns new `version`
+- If `version` mismatch: Return `409 Conflict` with current `version` and full record
+- Client must re-read and retry with new `version`
+
+**Why:** Prevents silent overwrites when multiple users edit simultaneously.
+
+---
+
+## Offline & Sync
+
+### Overview
+
+While offline, client queues dispatch submissions locally. On reconnect, client submits queue via batch endpoint.
+
+---
+
+### POST /dispatches/batch
+
+Submit multiple queued dispatches at once.
+
+**Status:** 🟡 **NICE-TO-HAVE (deferred if offline not in MVP)**
+
+**Authentication:** Required (JWT token)
+
+**Request Body:**
+```json
+{
+  "dispatches": [
+    {
+      "client_id": "queue_1",
+      "location": {...},
+      "description": "First offline dispatch",
+      "urgency": "normal",
+      "submitted_at": "2026-01-17T13:00:00Z"
+    },
+    {
+      "client_id": "queue_2",
+      "location": {...},
+      "description": "Second offline dispatch",
+      "urgency": "critical",
+      "submitted_at": "2026-01-17T13:05:00Z"
+    }
+  ]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "results": [
+    {
+      "client_id": "queue_1",
+      "dispatch_id": "dsp_new_1",
+      "status": "success"
+    },
+    {
+      "client_id": "queue_2",
+      "dispatch_id": "dsp_new_2",
+      "status": "success"
+    }
+  ],
+  "failed_count": 0
+}
+```
+
+**Partial Failure Handling:**
+- If some succeed and some fail, return 207 Multi-Status with per-item status
+- Client should retry failed items individually
+
+---
+
+## Data Ownership & Multi-Tenancy
+
+### Region Scoping
+
+Users have `allowed_regions[]` in their profile. Queries automatically filter by user's regions.
+
+```bash
+GET /dispatches?region=us-east-1
+# Returns only dispatches in us-east-1
+# Error if user not authorized for us-east-1
+```
+
+### PII Redaction
+
+**Unauthenticated Users (if allowed by region config):**
+- Can view dispatch list and details
+- Cannot see submitter names (shows "Anonymous")
+- Cannot see responder names (redacted)
+- Cannot create or modify dispatches
+
+**Configuration:** `region.allow_unauthenticated_viewing` (set per region)
+
+---
+
+## Rate Limiting
+
+**Global Limits (per user, per minute):**
+- Dispatch creation: 10 per minute
+- List queries: 100 per minute
+- Responder status updates: 100 per minute
+
+**Rate Limit Headers (in all responses):**
+```
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+X-RateLimit-Reset: 1642437600
+```
+
+**When Limit Exceeded:**
+```
+429 Too Many Requests
+Retry-After: 30
+```
+
+---
+
+## Deployment Requirements
+
+### Backend Framework & Language
+
+- Language: (Not specified in this doc; team decision)
+- Framework: (Not specified in this doc; team decision)
+- API Format: RESTful JSON + Server-Sent Events (SSE)
+- Database: (Not specified in this doc; see DB schema doc)
+
+### Infrastructure
+
+- HTTPS only (no HTTP)
+- CORS headers for frontend origin
+- Health check endpoint: `GET /health` → `{"status":"healthy","timestamp":"..."}`
+- Readiness check: `GET /ready` → `{"ready":true}` or `503 Service Unavailable`
+
+### Deployment Checklist
+
+- [ ] All endpoints deployed and tested in staging
+- [ ] Database migrations applied
+- [ ] Secrets (JWT signing key, API keys) stored securely
+- [ ] Rate limiting configured
+- [ ] Logging & error monitoring enabled
+- [ ] CORS headers configured for frontend domain
+- [ ] HTTPS certificate valid
+- [ ] Health/readiness checks returning 200
+- [ ] Load testing complete (baseline for auto-scaling)
+- [ ] Monitoring dashboards live
+- [ ] On-call rotation established
+
+---
+
+## Dependency: Database Schema
+
+This API contract depends on database schema decisions (Blocker #2). Expected tables:
+
+- `dispatches` (id, location_lat, location_lon, description, urgency, status, submitter_id, created_at, updated_at, closed_at, version)
+- `responders` (id, dispatch_id, responder_id, status, claimed_at, updated_at)
+- `audit_log` (id, event_type, actor_id, dispatch_id, before_state, after_state, timestamp)
+
+---
+
+## Dependency: Authentication Architecture
+
+This API contract depends on auth architecture decisions (Blocker #3). Expected:
+
+- JWT signing key management
+- Token refresh strategy
+- Session expiry policy
+- Role/permission definitions (responder vs. admin vs. guest)
+- Multi-region user isolation rules
+
+---
+
+## Testing Checklist
+
+**Before Sprint 0 Completes:**
+
+- [ ] POST /auth/login works with valid credentials
+- [ ] POST /dispatches creates dispatch with valid payload
+- [ ] GET /dispatches lists dispatches for user's region
+- [ ] GET /dispatches/:id returns dispatch details
+- [ ] PATCH /dispatches/:id updates urgency correctly
+- [ ] POST /dispatches/:id/respond adds responder and pauses escalation
+- [ ] GET /notifications/stream connects and receives events
+- [ ] All error responses return 4xx/5xx with standardized format
+- [ ] Idempotency (duplicate client_id) prevents duplicates
+- [ ] Pagination cursor works across multiple requests
+- [ ] Version-based conflict detection works (409 on mismatch)
+- [ ] Rate limiting enforced and headers present
+- [ ] PII redaction for unauthenticated users (if enabled)
+- [ ] CORS headers present
+- [ ] Health check responds 200
+
+---
+
+## Migration Path: From Spec to Implementation
+
+**Recommended Sequence:**
+
+1. **Sprint 0 (Phase A):**
+   - Implement auth endpoints (login, logout, session)
+   - Implement dispatch CRUD (create, read, list)
+   - Set up error formatting & standard response structure
+
+2. **Sprint 0 (Phase B):**
+   - Implement responder signaling (respond, status update)
+   - Implement notifications (SSE connection)
+   - Set up pagination & versioning
+
+3. **Sprint 1:**
+   - Refine based on frontend integration feedback
+   - Add rate limiting & monitoring
+
+4. **Sprint 2-4:**
+   - Extend with additional endpoints as needed
+   - Performance optimization based on telemetry
+
+---
+
+## Owners & Contacts
+
+| Role | Name/Team | Contact |
+|------|-----------|---------|
+| API Design Owner | Backend Lead | (TBD) |
+| Database Owner | Backend/DB Lead | (TBD) |
+| Deployment Owner | DevOps Lead | (TBD) |
+| Frontend Integration | Frontend Lead | (TBD) |
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-01-17 | Initial MVP spec covering Sprints 0-4 endpoints |
+
+---
+
+## Next Steps
+
+1. **Backend team:** Review this spec and raise clarifying questions by 2026-01-20
+2. **Team decision:** Choose backend framework, language, and database (if not already decided)
+3. **Database team:** Create ERD and schema migrations (Blocker #2) aligned with this API
+4. **Frontend team:** Begin integration testing against staging API
+5. **DevOps team:** Set up CI/CD pipeline and staging environment
+
+---
+
+**Document Status:** 🟢 **READY FOR IMPLEMENTATION**  
+**Blocks Sprints:** 0, 1, 2, 3, 4  
+**Related Documents:**
+- [MVP Gaps & Blockers](/roadmap/mvp-gaps-and-blockers#1-backend-api-contracts-not-specified) (Blocker #1)
+- [Database Schema & Persistence](/roadmap/mvp-gaps-and-blockers#2-database-schema--persistence-not-documented) (Blocker #2, dependent)
+- [Authentication Architecture](/roadmap/mvp-gaps-and-blockers#3-authentication--authorization-architecture-not-defined) (Blocker #3, dependent)

@@ -1,0 +1,125 @@
+# Backend API Contracts
+
+**Date:** 2026-01-17  
+**Status:** 🟢
+
+---
+
+## What Was Blocking
+
+The backend API contracts were undefined. Every sprint in the roadmap assumed API endpoints but none were specified. This created risk:
+
+- Frontend team couldn't start integration work
+- Backend team didn't know what to build
+- No contract for error handling, pagination, or conflict resolution
+- Sprints 0-4 all depended on guessing the API shape
+
+---
+
+## Resolution: Backend API Contracts Specification
+
+A comprehensive OpenAPI-style specification is now available: [Backend API Contracts](/specs/backend-api-contracts)
+
+### Coverage
+
+** Authentication & Sessions**
+- `POST /auth/login` - Credentials → JWT token + cookie
+- `POST /auth/logout` - Clear session
+- `GET /auth/session` - Check health and refresh token
+
+** Dispatch CRUD**
+- `POST /dispatches` - Submit a dispatch (with idempotency via `client_id`)
+- `GET /dispatches` - List active dispatches (cursor-based pagination)
+- `GET /dispatches/:dispatch_id` - Detail view
+- `PATCH /dispatches/:dispatch_id` - Update location, urgency, description, or status
+
+** Responder Signaling**
+- `POST /dispatches/:dispatch_id/respond` - "I'm responding" signal
+- `PATCH /dispatches/:dispatch_id/respond/:responder_id` - Status update (arrived, assisting, cleared)
+- `GET /dispatches/:dispatch_id/responders` - List responders for a dispatch
+
+** Notifications**
+- `GET /notifications/stream` - Real-time SSE connection for push events
+
+** Error Handling**
+- Standardized error response format with `code`, `message`, `details`
+- Standard HTTP status codes (400, 401, 403, 404, 409, 422, etc.)
+
+** Data Safety**
+- Optimistic locking with `version` field (prevents silent overwrites)
+- Idempotent operations (duplicate submissions create no duplicates)
+- Rate limiting (10 creations/min per user, 100 queries/min per user)
+
+** Offline Support (if MVP includes)**
+- `POST /dispatches/batch` - Submit multiple queued dispatches at once
+
+### Key Design Decisions Made
+
+| Decision | Rationale |
+|----------|-----------|
+| **Cursor-based pagination** | Real-time data changes; offset becomes unreliable |
+| **Server-Sent Events (SSE) for notifications** | Simpler than WebSockets; real-time without polling |
+| **JWT tokens in cookies (HttpOnly)** | Secure by default; no localStorage exposure |
+| **Optimistic versioning** | Prevents silent data loss in concurrent edits |
+| **Idempotency via `client_id`** | Ensures no duplicates on retries |
+| **PII redaction for unauthenticated views** | Allows Scenario 10 (new users can observe without login) |
+
+### Implementation Timeline
+
+The spec is structured for progressive implementation:
+
+1. **Sprint 0, Phase A:** Auth + basic dispatch CRUD
+2. **Sprint 0, Phase B:** Responder signaling + notifications
+3. **Sprint 1-4:** Refinements based on integration feedback
+4. **Sprint 5 (conditional):** Offline batch endpoint
+
+---
+
+## Next Steps
+
+### For Backend Team
+
+- [ ] Review spec and raise clarifications by **2026-01-20**
+- [ ] Choose implementation language/framework (if not already decided)
+- [ ] Begin Sprint 0 kickoff implementation of auth endpoints
+- [ ] Coordinate with Database team on schema (Blocker #2)
+
+### For Frontend Team
+
+- [ ] Review spec and plan integration tests
+- [ ] Set up mock server or staging API connection
+- [ ] Begin Sprint 0 integration work against spec
+
+### For Product/Platform Team
+
+- [ ] Confirm offline strategy (Blocker #4) - affects `/dispatches/batch` scope
+- [ ] Confirm region strategy (Blocker #5) - affects multi-region auth/filtering
+- [ ] Confirm crisis vs. management mode scope (Blocker #6) - affects role-based access patterns
+
+---
+
+## Remaining Blockers (All Resolved ✅)
+
+All critical blockers are now resolved as of 2026-01-17:
+
+- ✅ **Blocker #1:** Backend API Contracts - RESOLVED
+- ✅ **Blocker #2:** Database schema - RESOLVED ([Schema](/specs/database-schema))
+- ✅ **Blocker #3:** Authentication & authorization architecture - RESOLVED ([Auth](/specs/authentication-architecture))
+- ✅ **Blocker #4:** Offline support - RESOLVED ([Offline](/specs/offline-support-architecture))
+- ✅ **Blocker #5:** Multi-region scope - RESOLVED ([Regions](/specs/region-scope-architecture))
+- ✅ **Blocker #6:** Crisis & management modes - RESOLVED ([Modes](/specs/crisis-management-mode-strategy))
+
+**Status:** Ready for Sprint 0 implementation. All architectural decisions finalized.
+
+---
+
+## Document Links
+
+- **Specification:** [Backend API Contracts](/specs/backend-api-contracts)
+- **Blocker List:** [MVP Gaps & Blockers](/roadmap/mvp-gaps-and-blockers)
+- **Roadmap:** [Roadmap Overview](/roadmap/roadmap-overview)
+- **Constitution:** [System Constitution](/constitution/system-constitution)
+
+---
+
+**Next Review:** Sprint 0 kickoff execution checkpoint (2026-01-25).

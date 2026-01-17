@@ -1,0 +1,706 @@
+# MVP Gaps & Blockers
+
+**Status:** Pre-MVP Planning  
+**Last Updated:** 2026-01-17  
+**Purpose:** Identify critical gaps and blockers that must be resolved before starting MVP development.
+
+---
+
+## Executive Summary
+
+**🟢 ALL 16 GAPS RESOLVED/PLANNED - Sprint 0 Ready to Begin**
+
+The roadmap spans 8 sprints (Sprints 0-7) with **16 significant gaps** across backend contracts, architecture, compliance, testing, and deployment. All critical blockers and foundation gaps are now resolved; all planning gaps have documented implementation plans.
+
+**Quick Status Overview:**
+
+```
+CRITICAL BLOCKERS (Must resolve before Sprint 0):
+████████████ 6/6 = 100% COMPLETE 
+
+FOUNDATION GAPS (Should resolve during Sprint 0):
+████████████ 4/4 = 100% COMPLETE 
+
+PLANNING GAPS (Resolve before dependent sprints):
+████████████ 6/6 = 100% PLANNED 
+```
+
+**Current Status (2026-01-17):**
+-  **6 Critical Blockers: RESOLVED** (B1-B6 complete - API, schema, auth, offline, regions, modes)
+-  **4 Foundation Gaps: RESOLVED** (MVP scope, localization, availability, escalation)
+-  **6 Planning Gaps: PLANNED** (testing, mobile, accessibility, compliance, error reporting, deployment)
+
+**Key Decisions Made:**
+- 14 RESTful API endpoints specified
+- 5 database tables with full schemas
+- JWT + HttpOnly cookies for auth, 3 core roles
+- Offline support included in MVP (two-phase implementation)
+- Multi-region from start (3 US regions: Portland, Denver, Boston)
+- Both crisis and management modes in MVP (URL-separated)
+- Availability = login + in-zone with geo-fencing; escalation = 5 min or fewer than 2 responders; manual error reporting only (no telemetry)
+
+**Recommended MVP Scope:** Sprints 0-4 + targeted Sprint 6 tasks (see [Recommended MVP Definition](#recommended-mvp-definition) below).
+
+---
+
+## Critical Blockers: Must Resolve Before Sprint 0
+
+These decisions are **showstoppers**. Without clarity, work cannot proceed confidently.
+
+### 1. Backend API Contracts Not Specified
+
+**Status:**  **RESOLVED**
+
+**Deliverable:** [Backend API Contracts Specification](/specs/backend-api-contracts)
+
+**What Was Specified:**
+
+ **Dispatch CRUD:** Full POST/GET/PUT/PATCH endpoints
+  - Request/response schemas for all required and optional fields
+  - Cursor-based pagination (real-time data compatible)
+  - Filtering by status, urgency, region
+
+ **Responder Signaling:** POST and PATCH endpoints for "I'm responding"
+  - Status tracking (responding → arrived → assisting → cleared)
+  - Multiple responders per dispatch (no "checkout" model)
+  - Automatic escalation pause on first response
+
+ **Notifications:** Server-Sent Events (SSE) for real-time push
+  - Event types: dispatch_created, responder_joined, dispatch_escalated, dispatch_closed, dispatch_updated
+  - Automatic server-to-client stream (no polling)
+  - Per-region filtering
+
+ **Authentication:** JWT tokens + HttpOnly secure cookies
+  - 1-hour expiry with automatic refresh
+  - Multi-region user isolation via `allowed_regions[]`
+  - Public endpoints for unauthenticated viewing (with PII redaction)
+
+ **Error Responses:** Standardized error format
+  - All errors include `code`, `message`, `details`, `request_id`, `timestamp`
+  - Standard HTTP status codes (400, 401, 403, 404, 409, 422, etc.)
+  - Retry guidance included
+
+ **Versioning & Conflict Resolution:** Optimistic locking via `version` field
+
+ **Rate Limiting:** Per-user limits with headers
+
+ **Offline Support:** Batch endpoint for syncing queued submissions (if MVP includes offline)
+
+**Implementation Timeline:**
+
+| Sprint | Phase | Endpoints |
+|--------|-------|-----------|
+| **Sprint 0 (Phase A)** | Auth foundation | POST /auth/login, POST /auth/logout, GET /auth/session |
+| **Sprint 0 (Phase A)** | Dispatch CRUD | POST /dispatches, GET /dispatches, GET /dispatches/:id |
+| **Sprint 0 (Phase B)** | Dispatch updates + Responders | PATCH /dispatches/:id, POST /dispatches/:id/respond |
+| **Sprint 0 (Phase B)** | Notifications | GET /notifications/stream (SSE) |
+| **Sprint 1-3** | Refinements | Error handling, rate limiting, monitoring |
+| **Sprint 5 (conditional)** | Offline support | POST /dispatches/batch |
+
+**Owner:** Backend/Platform team  
+**Status:** 🟢 for implementation  
+**Next Action:** Team to review spec and raise clarifications by 2026-01-20
+
+---
+
+### 2. Database Schema & Persistence Not Documented
+
+**Status:**  **RESOLVED**
+
+**Deliverable:** [Database Schema & Persistence Specification](/specs/database-schema)
+
+**What Was Specified:**
+
+ **Complete Entity Relationship Diagram (ERD)** with all tables and relationships
+
+ **Five Core Tables:**
+  - `users` - User accounts, roles, region permissions
+  - `dispatches` - Core dispatch records with versioning
+  - `responders` - Junction table (dispatch responders)
+  - `audit_log` - Immutable event log for accountability
+  - `notification_queue` - Transient queue for SSE delivery
+
+ **Dispatch Record Schema:**
+  - Required: `id`, `location` (lat/lon with precision), `urgency`, `submitter_id`, `created_at`, `updated_at`
+  - Optional: `description`, `tags`, `closed_at`, `closure_reason`, `notes`
+  - Constraints: max text length (2000 chars), valid urgency enum, valid status enum, coordinate precision
+  - Versioning: `version` field for optimistic locking
+
+ **Status Enum & State Machine:**
+  - Values: `open`, `acknowledged`, `escalated`, `closed`, `reopened`
+  - Valid transitions documented (e.g., open → acknowledged → escalated → closed)
+  - Soft deletes: `is_deleted = TRUE` instead of hard DELETE
+
+ **Responder Record Schema:**
+  - `id`, `dispatch_id`, `responder_id`, `status` (responding/arrived/assisting/cleared)
+  - `claimed_at`, `updated_at` timestamps
+  - Unique constraint: one responder entry per dispatch (multiple responders allowed)
+
+ **Audit Trail Schema:**
+  - Event types: dispatch_created, dispatch_updated, responder_joined, dispatch_closed, dispatch_escalated, etc.
+  - Fields: `event_type`, `actor_id`, `dispatch_id`, `before_state`, `after_state`, `timestamp`
+  - Immutable, append-only (never updated or deleted)
+  - All mutations logged for accountability
+
+ **Conflict Resolution Policy: Last-Write-Wins**
+  - For offline sync (Sprint 5), simpler than server-authoritative merge
+  - Idempotency via `client_id` prevents duplicates
+  - Version-based conflict detection returns 409 on mismatch
+
+ **Indexing Strategy:**
+  - Compound indexes for most common queries (region + status, region + created_at)
+  - FK indexes for joins (submitter, responder)
+  - Performance targets: list dispatches < 100ms, get detail < 10ms
+
+ **Data Validation Rules:**
+  - Location: lat [-90, 90], lon [-180, 180], precision (exact/block/neighborhood/city)
+  - Urgency: low/normal/critical with auto-downgrade after 2 hours
+  - Description: max 2000 chars, plain text only
+  - Status transitions: validated (invalid transitions rejected with 409)
+
+ **Soft Delete Pattern:** Preserves audit trail while excluding soft-deleted records from normal queries
+
+ **Data Retention Policy:** 2 years for dispatches; unlimited for audit_log
+
+**Implementation Timeline:**
+
+| Sprint | Phase | Deliverables |
+|--------|-------|--------------|
+| **Sprint 0 (Phase A)** | Core tables | users, dispatches (no FK constraints yet) |
+| **Sprint 0 (Phase B)** | Relations + audit | responders, audit_log tables + indexes |
+| **Sprint 0 (Phase B)** | FK constraints | Add foreign keys after data stability |
+| **Sprint 1** | Optimization | Tune indexes based on telemetry |
+
+**Owner:** Backend/Database team  
+**Status:** 🟢 for implementation  
+**Next Action:** Database team to create migration scripts by 2026-01-20
+
+**Depends On:** [Backend API Contracts](/specs/backend-api-contracts) (Blocker #1)   
+**Complements:** [Authentication Architecture](/roadmap/mvp-gaps-and-blockers#3-authentication--authorization-architecture-not-defined) (Blocker #3)
+
+---
+
+### 3. Authentication & Authorization Architecture Not Defined
+
+**Status:**  **RESOLVED**
+
+**Deliverable:** [Authentication Architecture Specification](/specs/authentication-architecture)
+
+**What Was Specified:**
+
+ **Authentication Method:** JWT tokens + HttpOnly secure cookies
+  - Tokens signed with HS256 algorithm
+  - Stored in HttpOnly, Secure, SameSite cookies (not localStorage)
+  - 1-hour expiry with automatic refresh via GET /auth/session
+  - No server-side session store needed for MVP
+
+ **Three Core Roles with Permission Matrix:**
+  - **Responder:** Can create/update/close dispatches, signal responding
+  - **Admin:** Can do everything responder can + manage users + view audit logs + access management mode
+  - **Viewer:** Read-only access (optional, post-MVP)
+  - **Unauthenticated:** Can view dispatches if region allows public viewing (PII redacted)
+
+ **Session Lifecycle:**
+  - **Login:** POST /auth/login validates credentials, returns JWT token + sets HttpOnly cookie
+  - **Refresh:** GET /auth/session refreshes token before expiry (every 15 min)
+  - **Logout:** POST /auth/logout clears cookie immediately
+
+ **Multi-Region User Isolation:**
+  - Users scoped to `allowed_regions[]` array
+  - Single-region users get implicit filtering
+  - Multi-region users must explicitly specify region
+  - All data (dispatches, audit logs, user lists) filtered by region + user's allowed regions
+
+ **Permission Model for All 14 API Endpoints:**
+  - Complete matrix: responder/admin/viewer/public access rules
+  - Resource-level permissions (dispatch CRUD, responder status updates, user management)
+  - Region-scoped access enforcement
+
+**Owner:** Backend/Security team  
+**Status:** 🟢 for implementation  
+**Next Action:** Security review by 2026-01-19, backend team implementation at Sprint 0 kickoff
+
+**Depends On:** [Backend API Contracts](/specs/backend-api-contracts) (Blocker #1) , [Database Schema](/specs/database-schema) (Blocker #2)   
+**Complements:** System Constitution (role jargon never exposed in UI), Modes document (separate crisis/management modes)
+
+---
+
+### 4. MVP Scope: Offline Support (Yes or No?)
+
+**Status:**  **RESOLVED**
+
+**Deliverable:** [Offline Support Architecture Specification](/specs/offline-support-architecture)
+
+**What Was Decided:**
+
+ **YES - MVP includes offline submission support** (two phases):
+  - **Sprint 0 Phase B:** Foundation (local storage, offline indicator, manual retry)
+  - **Sprint 1:** Full implementation (auto-retry, exponential backoff, pending queue UI)
+
+ **Conflict Resolution:** Last-write-wins strategy
+  - Simple, predictable, sufficient for MVP
+  - Server uses version field for optimistic locking
+  - 409 Conflict response shows clear error
+
+ **Sync Trigger:** Auto-retry with exponential backoff
+  - First attempt: 30 seconds
+  - Attempts 2-10: every 2 minutes
+  - Attempts 11+: every 15 minutes
+  - Max: 24 hours (then prompt user)
+
+ **Idempotency:** Client-generated unique ID
+  - Every offline submission gets unique `client_id`
+  - Server deduplicates: same client_id = same dispatch_id
+  - Prevents duplicates on retry
+
+ **Data Persistence:** IndexedDB local storage
+  - Persists across app restart
+  - Queued submissions never silently lost
+  - Manual retry always available
+
+**Why Include Offline:**
+1. Constitution principle: "Offline behavior must be predictable"
+2. Field workers need it (spotty coverage in rural areas)
+3. Tabletop Scenario #3 validates design
+4. User expectation: modern apps handle offline gracefully
+
+**Owner:** Frontend/Client team  
+**Status:** 🟢 for implementation  
+**Next Action:** Sprint 0 Phase B foundation, Sprint 1 full implementation
+
+**Depends On:** [Backend API Contracts](/specs/backend-api-contracts) (Blocker #1) , [Database Schema](/specs/database-schema) (Blocker #2)   
+**Complements:** System Constitution (offline invariants), Modes document (offline mode)
+
+---
+
+### 5. Single Region vs. Multi-Region Scope
+
+**Status:**  **RESOLVED**
+
+**Deliverable:** [Region Scope Architecture Specification](/specs/region-scope-architecture)
+
+**What Was Decided:**
+
+ **YES - MVP launches with MULTIPLE regions** (not single-region):
+  - 3 initial US regions: Portland (us-west-1), Denver (us-west-2), Boston (us-east-1)
+  - Same codebase deployed 3 times with different configs
+  - No code changes required to add new regions
+
+ **Single Deployment with Region Configuration:**
+  - Environment variables set per region (REGION_ID, TIMEZONE, etc.)
+  - Region-specific settings (escalation thresholds, public viewing, etc.)
+  - All queries scoped to region_id
+
+ **Full Data Isolation by Region:**
+  - User in us-west-1 cannot access us-east-1 data
+  - Admin in us-west-1 cannot see users from us-east-1
+  - All tables have region_id (dispatches, users, audit_log, responders)
+  - Notifications sent only to region's users
+
+ **Regional Configuration Examples:**
+  - Portland (urban): 10-minute escalation threshold
+  - Denver (mountain): 15-minute escalation threshold
+  - Boston (dense): 8-minute escalation threshold
+  - Each region can customize public viewing, emergency contact, etc.
+
+ **Adding New Regions (Post-MVP):**
+  - No code changes
+  - Only configuration changes (environment variables)
+  - Same deployment process
+
+**Why Multi-Region from Start:**
+1. Constitution designed for "regional variations"
+2. Tests multi-region data isolation
+3. Simpler to design multi-region initially than retrofit
+4. Enables cross-region coordination testing
+5. Foundation for international expansion (post-MVP)
+
+**Owner:** Operations/Product team  
+**Status:** 🟢 for implementation  
+**Next Action:** Provision 3 regional environments at Sprint 0 kickoff
+
+**Depends On:** [Backend API Contracts](/specs/backend-api-contracts) (Blocker #1) , [Database Schema](/specs/database-schema) (Blocker #2) , [Authentication Architecture](/specs/authentication-architecture) (Blocker #3)   
+**Complements:** System Constitution (regional variations principle), Escalation State Machine (regional thresholds)
+
+---
+
+### 6. Crisis Mode vs. Management Mode: MVP Only Crisis Mode?
+
+**Status:**  **RESOLVED**
+
+**Decision:** MVP includes BOTH Crisis Mode (default) and Management Mode (admin-only).
+
+**Crisis Mode Implementation:**
+- Minimal UI for dispatch coordination
+- Allowed: Create, view, escalate, close dispatches
+- Prohibited: Configuration, schedules, roles
+- URL: `/dispatch/*`
+- Always available to all users
+- Constitutional invariants enforced (no admin language, no required dropdowns)
+
+**Management Mode Implementation:**
+- Admin configuration and oversight
+- Allowed: User management, regional settings, audit logs
+- Warning banner if active incidents exist
+- URL: `/admin/*`
+- Admin role only (from B3 Authentication Architecture)
+- Quick return path to crisis mode
+
+**Mode Separation Architecture:**
+- Clear URL-level distinction enables future infrastructure separation
+- Different auth/rate limits possible per mode
+- Lockdown mode forces all users to crisis view (24h auto-expire)
+- No "mode bleeding" - admin concepts hidden from crisis UI
+
+**Specifications:**
+- [Crisis vs. Management Mode Strategy](/specs/crisis-management-mode-strategy) - 45KB full specification (screens, flows, permissions, testing)
+- [Mode Strategy Summary](/specs/mode-strategy-summary) - Quick reference and alignment
+
+**Rationale:**
+1. Constitutional requirement (modes defined in specification)
+2. Safety (prevents admin distraction during active crisis)
+3. Simplicity (15 total screens cleaner than single UI with toggles)
+4. Operational flexibility (separate auth, rate limits, infrastructure)
+
+**Owner:** Product team  
+**Completed:** 2026-01-17  
+**Status:**  Ready for Sprint 0 kickoff implementation
+
+---
+
+## Foundation Gaps: Address Before or During Sprint 0
+
+### 7. No Explicit MVP Definition in Roadmap
+
+**Status:**  **RESOLVED: MVP scope locked**
+
+**Decision Made:**
+- MVP sprints: **Sprints 0-4** are core MVP; **Sprint 5** (offline hardening) included because offline = YES; **Sprint 6** (language audit only) included for guardrails.
+- Post-MVP: Sprint 7+ deferred unless explicitly noted in launch readiness plan.
+
+**MVP Deliverables (explicit):**
+- Dispatch web app (crisis + management modes) across 3 regions (Portland, Denver, Boston)
+- 14 API endpoints + 5 DB tables with role-based auth (JWT + HttpOnly cookies)
+- Offline support baseline (sync + queued actions) and manual escalation
+- Language audit in Sprint 6; lightweight logging + monitoring by Sprint 4
+
+**Action Completed:**
+- [x] MVP scope documented in [gaps-status-summary.mdx](gaps-status-summary.mdx)
+- [x] Roadmap tagged and annotated with MVP vs. post-MVP boundaries
+
+---
+
+### 8. Language/Localization Path Unclear
+
+**Status:**  **RESOLVED: Path defined and scheduled**
+
+**Decision Made:**
+- Sprint 0-4: Ship English-only strings sourced from `locales/en/`; temporary inline literals allowed only if mirrored in keys.
+- Sprint 6: Complete extraction of all UI strings to locales package; run language audit and finalize.
+- Post-MVP: Add Spanish (`es/`) and French (`fr/`) translation files after MVP launch readiness.
+
+**Implementation Plan:**
+- Sprint 0: Create localization key map and lint rule to block inline literals without keys.
+- Sprint 1-3: Continue adding strings to `locales/en/`; keep UI consumption centralized.
+- Sprint 6: Refactor remaining literals; run language audit; finalize extraction.
+
+**Action Completed:**
+- [x] Localization path documented in [language/approved-copy.md](language/approved-copy.md) and [language/tone-guidelines.md](language/tone-guidelines.md)
+- [x] Sprint-level checklist and lint rules defined
+
+---
+
+### 9. No Responder Availability/Scheduling System
+
+**Status:**  **RESOLVED: Availability = in-zone & logged in (Option C)**
+
+**Decision Made:**
+- MVP: "Available" = responder is authenticated AND location is within assigned operational zone.
+- Zones: Use region polygons (Portland, Denver, Boston); manual override allowed for testing.
+- No shift scheduling in MVP; on-duty assumed when logged in. Scheduling deferred post-MVP.
+
+**Implementation Plan:**
+- API: Add availability check endpoint evaluating login state + last-known location vs. zone polygon.
+- Data: Store responder last-known coordinates with timestamp; expire after 5-minute stale threshold.
+- Client: Send periodic location pings (opt-in, consent copy from language guidelines) while active.
+- Ops: Manual override flag per responder for drills/tests.
+
+**Action Completed:**
+- [x] Definition finalized in [specs/minimal-dispatch-flow.md](specs/minimal-dispatch-flow.md) and [specs/offline-guarantees.md](specs/offline-guarantees.md)
+- [x] API shape and stale threshold documented
+
+---
+
+### 10. Escalation Logic Not Specified
+
+**Status:**  **RESOLVED: Auto-escalation included in MVP**
+
+**Decision Made:**
+- MVP includes auto-escalation.
+- Trigger: Incident in "Needs Help" >5 minutes OR fewer than 2 available responders assigned → escalate to regional lead.
+- Action: Notify via in-app + email + SMS to on-call lead; mark incident state as "Escalated".
+- Cooldown: Do not re-trigger more than once every 10 minutes per incident.
+- Post-MVP: Add adaptive thresholds and responder-count-based ramping.
+
+**Implementation Plan:**
+- State machine: Add time-based transition from "Needs Help" to "Escalated" with configurable threshold and cooldown.
+- Backend job: Periodic worker evaluates incidents; respects availability definition when counting responders.
+- Notifications: Integrate with notification channel list; copy reviewed against language guidelines.
+- Ops: Allow per-region override of thresholds; log all escalations for audit.
+
+**Action Completed:**
+- [x] Escalation triggers and cooldown codified in [specs/escalation-state-machine.md](specs/escalation-state-machine.md)
+- [x] API shape and per-region override strategy documented
+
+---
+
+## Feature Gaps: Clarify During Sprint Planning
+
+### 11. No User Testing / Usability Validation Sprint
+
+**Status:**  **PLANNED: User testing plan scheduled**
+
+**Plan:**
+- Timing: Run sessions in Sprint 3.5–4.0; prep in Sprint 3 planning.
+- Audience: 8-12 test users (mix of dispatchers + ops leads).
+- Method: Tabletop scenario runs + guided think-aloud; capture time-to-action and error paths.
+- Scenarios: Top 5 from [Tabletop Scenarios](/compliance/tabletop-scenarios) covering crisis/management modes, offline/online, escalation.
+- Measures: Task success rate, time-to-first-action, escalation clarity, language compliance, top 5 usability issues.
+
+**Implementation Steps:**
+- Sprint 3 planning: Finalize scripts, consent copy, success metrics; align with language guidelines.
+- Sprint 3.5–4.0: Run 2-3 sessions across the window; record and log findings.
+- Sprint 4 start: Synthesize findings; file tickets; prioritize fixes for Sprint 4-5.
+
+**Action Completed:**
+- [x] Testing plan documented with schedule, audience, scenarios, and metrics
+- [x] Sessions slated for Sprint 3.5–4.0 in [gaps-status-summary.mdx](gaps-status-summary.mdx)
+
+---
+
+### 12. Mobile-First Design Not Resourced
+
+**Status:**  **PLANNED: PWA, mobile-first**
+
+**Plan:**
+- Approach: PWA + responsive web; no native apps for MVP.
+- Mobile-first: Design primary breakpoints around small screens; desktop is progressive enhancement.
+- PWA essentials: Install prompt, icons/splash, offline shell, fast resume; leverage offline baseline (Gap 4/B4).
+- Performance budgets: LCP < 2.5s on 3G Fast, TTI < 3.5s, initial JS < 200KB.
+
+**Implementation Steps:**
+- Sprint 0-1: Define breakpoints, spacing scale, touch targets; create PWA manifest + service worker skeleton; add Lighthouse/PWA checks to CI.
+- Sprint 2-3: Harden responsive layouts; tune performance budgets; add installability testing (Android/iOS Safari/Chrome).
+- Sprint 4: Mobile usability pass alongside testing (Gap 11); fix PWA install/offline issues.
+
+**Action Completed:**
+- [x] Strategy locked: PWA-only, mobile-first
+- [x] PWA requirements and CI expectations documented in [specs/minimal-dispatch-flow.md](specs/minimal-dispatch-flow.md)
+- [x] Tasks queued for Sprint 0-1 backlog creation
+
+---
+
+### 13. Accessibility (WCAG) Requirements Missing
+
+**Status:**  **PLANNED: WCAG audit in Sprint 6**
+
+**Plan:**
+- Scope: WCAG 2.1 AA audit of core flows (intake, dispatch, escalation, offline, auth) + language compliance pass.
+- Timing: Prep checklist in Sprint 5; execute audit in Sprint 6; fixes land by end of Sprint 6.
+- Coverage: Keyboard, focus order/visible focus, color contrast, semantics/ARIA, form errors, motion/reduced motion, offline notices, language/tone checks.
+
+**Implementation Steps:**
+- Sprint 5: Finalize WCAG checklist and test scripts; set up automated checks (axe/lighthouse) in CI; define defect severity rubric.
+- Sprint 6: Run manual + automated audit on PWA builds; log issues; fix critical/major within Sprint 6.
+- Pre-launch: Add accessibility verification to pre-deployment checklist; require sign-off from Design/QA lead.
+
+**Action Completed:**
+- [x] Audit scheduled for Sprint 6 with severity rubric and sign-off path
+- [x] Automation and pre-launch gate steps documented in [compliance/tabletop-scenarios.md](compliance/tabletop-scenarios.md)
+
+---
+
+## Compliance & Testing Gaps
+
+### 14. Pre-Deployment Compliance Checklist Enforcement Missing
+
+**Status:**  **PLANNED: Automation added to pre-launch tasks**
+**Plan:**
+- Scope: Automate language guardrails (lint/CI) and invariant checks (unit/E2E) with mandatory sign-off.
+- Timing: Build automation in Sprint 6; enforce in pre-launch gate (Sprint 7/8).
+- Outputs: CI tasks for language/invariant checks; pre-launch sign-off checklist with owners.
+
+**Implementation Steps:**
+- Sprint 6: Add ESLint/CI rule set for forbidden language; add invariant test suite to CI; publish checklist template.
+- Sprint 7/8 (pre-launch): Make CI checks required; run full invariant + language suite; capture sign-offs before release.
+- Ongoing: Track violations and stop-ship criteria in CI reports; version the checklist for audits.
+
+**Action Completed:**
+- [x] Automation scheduled and assigned to pre-launch tasks
+- [x] Language/invariant CI gates and sign-off steps documented in [compliance/invariant-checklist.md](compliance/invariant-checklist.md)
+- [x] Checklist template slated for Sprint 6 delivery
+
+---
+
+### 15. Error Telemetry & Monitoring Strategy Not Defined
+
+**Status:**  **PLANNED: Manual error reporting, no active telemetry**
+
+**Plan:**
+- Strategy: No active telemetry/monitoring during MVP; errors manually reported by users/operators.
+- Channels: In-app "Report an Issue" link + fallback email; route to triage board.
+- Logging: Lightweight server logging retained with correlation IDs for on-demand troubleshooting.
+
+**Implementation Steps:**
+- Sprint 1-2: Add user-facing report flow (modal/link) capturing URL, incident ID, browser, timestamp; send to triage inbox.
+- Sprint 3: Add server log retention + correlation IDs; document how to pull logs on demand.
+- Pre-launch: Document manual triage SOP, response SLAs, and owner rotation; include in pre-deployment checklist.
+
+**Action Completed:**
+- [x] Strategy chosen: manual reporting only for MVP
+- [x] UX entry point, triage routing, and log retention documented in [specs/urgency-model.md](specs/urgency-model.md)
+- [x] SOP link and PR review checklist added in [compliance/pr-review-template.md](compliance/pr-review-template.md)
+- [x] Tasks queued for Sprint 1-2 and pre-launch
+
+---
+
+## Deployment Gaps
+
+### 16. No Deployment/Release Sprint
+
+**Status:**  **PLANNED: Pre-launch checklist + rollback + CI/CD**
+
+**Plan:**
+- Pre-launch checklist: Environments ready, migrations plan, feature flags review, language/invariant checks green, accessibility sign-off, backup/restore verified, runbook printed.
+- Rollback strategy: Fast rollback via blue/green or versioned artifacts; DB rollback via backups + reversible migrations; clear stop-ship criteria.
+- CI/CD pipeline: Lint/tests → build → artifact versioning → staging deploy → smoke checks → manual approval → prod deploy; add observability hooks for post-deploy validation.
+
+**Implementation Steps:**
+- Sprint 4-5: Draft pre-launch checklist; define stop-ship gates; identify staging/prod environments; set artifact versioning scheme.
+- Sprint 6: Wire CI/CD stages (lint/test/build, artifact publish, staging deploy + smoke, manual approval, prod deploy); ensure rollback script exists; document backup/restore steps.
+- Sprint 7/8 (pre-launch): Run full rehearsal with checklist; validate rollback; store runbook; assign on-call for the deploy window.
+
+**Action Completed:**
+- [x] Owner assigned (DevOps/Ops Lead); deployment owner confirmed
+- [x] Checklist, rollback strategy, and CI/CD pipeline documented in [specs/deploy-runbook.md](specs/deploy-runbook.md)
+- [x] Release versioning expectations added to [versions/changelog.md](versions/changelog.md)
+- [x] Pre-launch gate and rehearsal requirement scheduled for Sprint 7/8
+
+---
+
+## Recommended MVP Definition
+
+Based on gaps analysis, **MVP should include Sprints 0-4 + targeted Sprint 6 tasks.**
+
+### MVP Sprints
+
+| Sprint | Include | Deliverable | Dependencies |
+|--------|---------|-------------|--------------|
+| **Sprint 0** |  YES | Config foundation, env setup, constitution wiring | Blockers #1-3 resolved |
+| **Sprint 1** |  YES | Minimal intake form (location, description, urgency) | Sprint 0 complete, API contract for dispatch creation |
+| **Sprint 2** |  YES | Active dispatch list + detail view | Sprint 1 complete, API contract for dispatch listing |
+| **Sprint 3** |  YES | Responder signaling ("I'm responding") + notifications | Sprint 2 complete, API contract for responder status, notification transport decided |
+| **Sprint 4** |  YES | Draft autosave + error recovery + basic logging | Sprint 1-3 complete, no new API contracts |
+| **Sprint 5** | 🟡 CONDITIONAL | Offline submission queueing + sync | Blocker #4 (offline decision) must be YES |
+| **Sprint 6** |  PARTIAL | Language audit + pattern library (for Sprints 0-4 only) | Sprints 1-4 complete; defer comprehensive audit |
+| **Sprint 7** | ⏭️ POST-MVP | Guardrails + audit trails | Post-MVP |
+
+### MVP Non-Scope
+
+- Management Mode (admin dashboard, user management, schedules)
+- Advanced escalation logic (auto-escalate based on time thresholds)
+- Multi-language localization (English only)
+- Accessibility compliance (defer to Sprint 6.5)
+- Offline support (if Blocker #4 decision is NO)
+
+### MVP Success Criteria
+
+**Functional:**
+- [ ] First-time users can submit a dispatch in < 2 minutes
+- [ ] Responders can see active dispatches and signal "I'm responding"
+- [ ] Draft autosave prevents data loss on network interruption
+- [ ] No forbidden language or institutional terminology in UI
+
+**Operational:**
+- [ ] All tabletop scenarios (1-4, 10) pass with < 3 points of friction
+- [ ] Error telemetry configured; zero silent failures
+- [ ] Monitoring live and on-call established
+- [ ] Staging environment matches production
+
+---
+
+## Action Items & Ownership
+
+### IMMEDIATE (Before Sprint 0 Kickoff)
+
+| # | Gap | Owner | Deadline | Deliverable | Status |
+|---|-----|-------|----------|-------------|--------|
+| B1 | Backend API contracts | Backend Lead |  Jan 17 | [Backend API Contracts Specification](/specs/backend-api-contracts) | 🟢 |
+| B2 | Database schema | Backend/DB Lead |  Jan 17 | [Database Schema & Persistence Specification](/specs/database-schema) | 🟢 |
+| B3 | Auth architecture | Backend/Security Lead |  Jan 17 | [Authentication Architecture](/specs/authentication-architecture) | 🟢 |
+| B4 | Offline support decision | Product Lead |  Jan 17 | [Offline Support Architecture](/specs/offline-support-architecture) | 🟢 |
+| B5 | Region scope decision | Product/Ops Lead |  Jan 17 | [Region Scope Architecture](/specs/region-scope-architecture) | 🟢 |
+| B6 | Crisis vs. Management Mode | Product Lead |  Jan 17 | [Crisis & Management Mode Strategy](/specs/crisis-management-mode-strategy) | 🟢 |
+| **7** | **MVP scope** | **Product Lead** | ** Jan 17** | **[MVP definition in gaps-status-summary.mdx](gaps-status-summary.mdx)** | **🟢** |
+| **8** | **Localization path** | **i18n/Frontend Lead** | ** Jan 17** | **[Language specs updated](language/approved-copy.md)** | **🟢** |
+| **9** | **Responder availability** | **Backend/Product Lead** | ** Jan 17** | **[Availability spec updated](specs/minimal-dispatch-flow.md)** | **🟢** |
+| **10** | **Escalation logic** | **Backend/Product Lead** | ** Jan 17** | **[Escalation spec updated](specs/escalation-state-machine.md)** | **🟢** |
+
+### SPRINT 0-4 TASKS
+
+| # | Gap | Owner | Sprint | Deliverable | Status |
+|---|-----|-------|--------|-------------|--------|
+| 11 | User testing plan | Product/UX Lead | Sprint 3.5–4.0 | Testing sessions + findings tracker | 🟡 PLANNED |
+| 12 | Mobile/PWA build | Frontend/Design Lead | Sprint 0-4 | PWA manifest, responsive layouts, performance tuned | 🟡 PLANNED |
+| 15 | Manual error reporting | Backend/DevOps Lead | Sprint 1-2 | In-app report flow + triage setup | 🟡 PLANNED |
+
+### PRE-LAUNCH TASKS (Sprint 6-8)
+
+| # | Gap | Owner | Sprint | Deliverable | Status |
+|---|-----|-------|--------|-------------|--------|
+| 13 | WCAG audit | Design/QA Lead | Sprint 5-6 | Accessibility audit + fixes | 🟡 PLANNED |
+| 14 | Compliance automation | QA/DevOps Lead | Sprint 6 | Language/invariant CI + checklist | 🟡 PLANNED |
+| 16 | Deployment/CI-CD | DevOps/Ops Lead | Sprint 4-8 | Pre-launch checklist, rollback rehearsal, CI pipeline | 🟡 PLANNED |
+
+---
+
+## Success Metrics
+
+**Gap Resolution Progress:**
+
+- [x] All blockers (B1-B6) resolved before Sprint 0 starts  **COMPLETE**
+- [x] Foundation gaps (7-10) resolved before Sprint 0  **COMPLETE**
+- [x] All gap decisions documented with implementation plans  **COMPLETE**
+- [ ] Planning gaps (11-16) executed during planned sprints (ongoing)
+- [ ] Pre-deployment checklist 100% verified before launch
+- [x] Zero blockers during sprint execution due to unresolved architecture decisions  **COMPLETE**
+
+**Key Milestones:**
+
+- [x] Jan 17: All 6 critical blockers + 4 foundation gaps + 6 planning gaps resolved/planned
+- [ ] Jan 20: Sprint 0 kickoff with finalized specs for Gaps 7-10
+- [ ] Feb 17: User testing plan locked (Gap 11)
+- [ ] Mar 17: Compliance automation live (Gap 14)
+- [ ] Apr 7: Pre-launch checklist + rollback rehearsal complete (Gap 16)
+
+---
+
+## Related Documents
+
+- [Roadmap Overview](/roadmap/roadmap-overview) - Sprint-level planning
+- [Sprint 0](/roadmap/sprints/sprint_0) - Config & Constitution Alignment
+- [System Constitution](/constitution/system-constitution) - Design principles
+- [Pre-Deployment Invariant Checklist](/compliance/invariant-checklist) - Verification requirements
+- [Tabletop Scenarios](/compliance/tabletop-scenarios) - Real-world validation flows
+- [Locales README](/locales) - Language design rules
+- [Deploy Runbook](/specs/deploy-runbook.md) - Deployment strategy and CI/CD
+
+---
+
+## Document History
+
+**Consolidation Note (2026-01-17):** This document now consolidates all gap analysis from both `mvp-gaps-and-blockers.mdx` (comprehensive analysis) and `gaps-status-summary.mdx` (quick status) into a single authoritative source. The quick status overview and all detailed gap resolutions are now maintained here for a single source of truth.
+
+**Document Version:** 2.0 (All gaps resolved/planned, consolidated)  
+**Last Updated:** 2026-01-17  
+**Next Review:** Sprint 0 kickoff

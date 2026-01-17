@@ -1,0 +1,338 @@
+# Sprint 5: Offline & Sync Guarantees
+
+## Executive Summary
+
+**Status:** Kickoff (after Sprint 0, 1, 2, 3, 4 completion)  
+**Sprint 0 Blockers:** 🟢 All 6 resolved (B1-B6: API, Schema, Auth, Offline, Regions, Modes)  
+**Sprint 1-4 Blockers:** 🟢 All complete and operational  
+**Sprint 5 Blockers:** Backend sync endpoint design; offline queue strategy finalized  
+
+**Action Items:**
+- [ ] Finalize backend conflict resolution policy with API team ([Offline Spec](/specs/offline-support-architecture))
+- [ ] Design queue data structure and storage schema
+- [ ] Set up mock API for offline/sync testing
+
+---
+
+## Sprint Intent
+- Ensure dispatch intake and updates function with intermittent connectivity via offline queueing and sync.
+- Provide clear status to users about queued work, sync progress, and conflicts.
+
+## Objective & Success Definition
+**Objective:** Enable dispatch submission and updates to proceed seamlessly during poor connectivity, with eventual consistency and transparent conflict resolution.
+
+**Success is achieved when:**
+- Users can submit while offline; items queue and sync transparently when online
+- Queued items are visible with clear "pending" or "syncing" indicators
+- Conflicts are resolved deterministically (documented policy) without user intervention needed
+
+## Framing the Unknowns
+- **Conflict Resolution:** Will the backend support merging (server-authoritative), or just last-write-wins?
+- **Sync Trigger:** Should sync be automatic on reconnect, periodic, or manual? When should it retry?
+- **Queue Persistence:** Should the queue survive browser restarts? For how long?
+- **Concurrent Updates:** Can users queue multiple edits to the same dispatch while offline?
+
+## Primary Risks & Tradeoffs
+**Risks:**
+- Queue corruption could lose queued items (mitigated by encrypted, versioned storage)
+- Mismatched conflict policies between client and backend cause data loss (mitigated by explicit documentation and testing)
+- Large queues stress local storage or memory (mitigated by queue size limits and user guidance)
+
+**Tradeoffs:**
+- **Auto-Sync vs. Manual:** Auto-sync is seamless but may consume data; manual sync gives control but users may forget
+- **Last-Write-Wins vs. Rich Merging:** Last-write-wins is simple but loses edits; rich merging is safe but adds complexity
+
+## Phased Implementation Plan
+**Phase 1 (Queue Structure & Persistence):**
+- Design queue data structure (timestamp, ID, action, payload)
+- Implement local storage for queue
+- Add queue UI (list of pending items)
+
+**Phase 2 (Sync Worker):**
+- Implement sync loop (check online status, iterate queue, post to API)
+- Handle retries with exponential backoff
+- Remove items from queue on success; mark as failed on error
+
+**Phase 3 (Conflict Handling):**
+- Document conflict policy (server-authoritative or last-write-wins)
+- Implement policy in sync worker
+- Test concurrent updates and edge cases
+
+**Phase 4 (UI & Transparency):**
+- Show queued items with status (pending, syncing, failed)
+- Allow manual retry or clear of failed items
+- Display conflict resolution results to user
+
+## Technology Stack
+- **Storage:** IndexedDB (for larger queues) or Local Storage (simpler)
+- **Sync Worker:** Service Worker or background task (depending on framework)
+- **Concurrency:** Navigator.onLine, or custom connectivity detector
+- **Backoff Strategy:** Exponential backoff library or custom implementation
+- **Conflict Merging:** Custom logic or CRDT library (if richness is needed)
+- **Testing:** Unit tests for queue operations; integration tests for sync with mock API
+- **Monitoring:** Telemetry to track queue sizes, sync success rates, conflicts
+
+## Dependencies
+- **Sprint 0 Complete:** All 6 blockers resolved ([API](/specs/backend-api-contracts), [Schema](/specs/database-schema), [Auth](/specs/authentication-architecture), [Offline](/specs/offline-support-architecture), [Regions](/specs/region-scope-architecture), [Modes](/specs/crisis-management-mode-strategy))
+- **Sprint 1 Complete:** Intake form deployed; dispatch records created and persisted
+- **Sprint 2 Complete:** Active dispatch list/detail views deployed and accessible
+- **Sprint 3 Complete:** Responder signaling and notifications operational
+- **Sprint 4 Complete:** Draft persistence, retry infrastructure, error logging working
+- **Offline Architecture:** Sprint 0 blocker B4 includes offline design; queuing implementation in Sprint 5 ([Offline Spec](/specs/offline-support-architecture))
+- **Idempotent API:** All submission endpoints support deduplication ([API Spec](/specs/backend-api-contracts#idempotency))
+- **Runtime Config:** API base URL and connectivity options configured ([Runtime Config](/turbo/apps/web/config/runtime.ts))
+- **Language Guidelines:** Tone and approved copy patterns available for queue/sync messaging ([Tone Guidelines](/language/tone-guidelines), [Approved Copy](/language/approved-copy))
+
+## Scope and Non-Scope
+- Scope:
+  - Offline submission queue for intake with eventual sync when connectivity returns.
+  - Visible status for queued items and in-progress sync.
+  - Basic conflict handling rules (e.g., last-write wins or server-authoritative merge) documented in UI copy.
+  - Sync retry with backoff and failure surfacing.
+- Non-Scope:
+  - Complex conflict resolution UIs.
+  - Multi-device merge policies beyond the chosen baseline.
+  - Full offline browsing of historical dispatches.
+
+## Core Deliverables
+- Client-side queue for dispatch submissions when offline, with persistent storage.
+- Sync worker/process that retries and clears queued items upon success; surfaces failures.
+- UI indicators for queued vs synced items and a simple way to retry or clear failed items.
+- Documented conflict policy communicated in the UI.
+- Copy aligned with language/tone guidelines; avoids ambiguity about data state.
+
+## Success Criteria
+- Users can submit while offline; items are queued and sync automatically when back online.
+- Queued items are visible with clear status; failures can be retried or cleared intentionally.
+- Conflict policy is explicit and enforced consistently with backend behavior.
+- Sync logic does not block online submissions and handles intermittent connectivity gracefully.
+
+---
+
+## Backend Team - Concrete Kickoff Tasks
+
+| Phase | Task | Deliverable | Validation |
+|-------|------|-------------|-----------|
+| 1 | Design batch sync endpoint (`POST /api/sync/batch`) | OpenAPI spec with request/response schema | API spec reviewed by frontend |
+| 1 | Define conflict resolution policy (server-authoritative or last-write-wins) | Decision doc with rationale | Signed off by product & backend lead |
+| 2 | Implement batch sync endpoint with payload validation | Working endpoint handling 1–100 items | Integration test suite |
+| 2 | Add conflict detection and resolution logic | Returns resolved state + conflict metadata | Unit tests for all conflict scenarios |
+| 3 | Implement idempotency for sync requests (retries safe) | Idempotency key support in endpoint | Documented for client consumption |
+| 4 | Build audit trail for sync events (client-side sync logged as backend change) | Sync event records in audit log | Audit log query endpoint tested |
+
+---
+
+## Frontend Team - Concrete Kickoff Tasks
+
+| Phase | Task | Deliverable | Validation |
+|-------|------|-------------|-----------|
+| 1 | Design offline queue data structure | Queue schema doc + example payloads | Reviewed by backend for sync compatibility |
+| 1 | Implement IndexedDB or Local Storage queue persistence | Working queue read/write with versioning | Unit tests covering storage lifecycle |
+| 1 | Build queue UI (list view with status badges) | Visual queue display in dispatch detail | Passes accessibility checks (WCAG 2.1 AA) |
+| 2 | Implement sync worker (auto-check online status, retry loop) | Worker code with exponential backoff | Integration tests with mock API |
+| 2 | Wire sync to frontend state management | Queue state updates UI in real-time | E2E test: offline submit → sync → cleared queue |
+| 3 | Implement conflict UI (show conflict, offer resolution options) | Conflict resolution component | Manual testing with conflict scenarios |
+| 4 | Add toast/notification for sync status changes | Clear messaging ("X items synced", "Sync failed") | Copy aligned with language guidelines |
+
+---
+
+## QA Team - Test Plan with Scenarios per Phase
+
+### Phase 1: Queue Structure & Persistence
+
+**Scenario 1.1: Queue Persists Across Browser Restart**
+- Action: Submit dispatch while offline; close browser; reopen
+- Expected: Queue item still present with same content
+- Automation: IndexedDB spy test
+
+**Scenario 1.2: Queue Display Accuracy**
+- Action: Queue 3 items while offline; view queue UI
+- Expected: All 3 items listed with timestamp, action, status="pending"
+- Automation: Snapshot test of queue list component
+
+**Scenario 1.3: Queue Size Limit Enforcement**
+- Action: Attempt to queue >N items (N = capacity limit)
+- Expected: Oldest item dropped or error shown; user warned
+- Automation: Parameterized test with queue fill-to-capacity
+
+### Phase 2: Sync Worker
+
+**Scenario 2.1: Auto-Sync on Reconnect**
+- Action: Queue item while offline; simulate reconnect
+- Expected: Sync starts immediately; item status → "syncing"
+- Automation: Mock online event + spy on API call
+
+**Scenario 2.2: Exponential Backoff on Transient Failure**
+- Action: Mock API returns 500; expect retry
+- Expected: Backoff: 1s → 2s → 4s → 8s (or configured intervals)
+- Automation: Timer mock + API call history assertion
+
+**Scenario 2.3: Queue Clears on Successful Sync**
+- Action: Queue item; mock successful API response
+- Expected: Item removed from queue; count → 0
+- Automation: IndexedDB spy + queue state assertion
+
+**Scenario 2.4: Failed Item Marked for Manual Retry**
+- Action: Mock API returns 400 (bad request) after max retries
+- Expected: Item status → "failed"; user can manually retry or delete
+- Automation: Button visible test + manual retry API call
+
+### Phase 3: Conflict Handling
+
+**Scenario 3.1: Last-Write-Wins Conflict**
+- Action: Queue update to field A while offline; backend also updated field A; sync
+- Expected: Backend version wins; UI shows conflict briefly or silently uses server version
+- Automation: Mock conflict response + state inspection
+
+**Scenario 3.2: Server-Authoritative Merge**
+- Action: Queue update to fields A, B; backend updated A; sync resolves as merge
+- Expected: Both A (server) and B (local) applied; item marked "synced with conflicts"
+- Automation: Response payload validation + UI state check
+
+**Scenario 3.3: Concurrent Edits by User**
+- Action: User queues update A; before sync, queues update B to same dispatch
+- Expected: Both queued; sync applies in order; no duplicates
+- Automation: Multi-queue test + backend state assertion
+
+**Scenario 3.4: Conflict UI Display**
+- Action: Trigger conflict scenario; user views queue item
+- Expected: Conflict badge visible; user can review diff or accept resolution
+- Automation: Conflict component renders with correct data
+
+### Phase 4: UI & Transparency
+
+**Scenario 4.1: Clear Status Badges**
+- Action: View queue with pending, syncing, failed items
+- Expected: Each item labeled; icon + color distinct
+- Automation: Visual regression test + accessibility check
+
+**Scenario 4.2: Sync Progress Indicator**
+- Action: Sync 5 items; user watches progress
+- Expected: Progress bar or count ("2/5 synced") updates in real-time
+- Automation: Animation frame spy + DOM updates
+
+**Scenario 4.3: Manual Retry Flow**
+- Action: Item in failed state; user clicks retry
+- Expected: Status → "syncing"; sync attempt; on success → removed
+- Automation: Button click simulation + state machine traversal
+
+**Scenario 4.4: Copy Clarity**
+- Action: Review all queue/sync messaging (pending toast, error messages, conflict copy)
+- Expected: No ambiguity; user clearly understands data state
+- Automation: Copy audit against language guidelines (or manual review)
+
+---
+
+## Documentation Quick Links
+
+| Role | Document | Purpose |
+|------|----------|----------|
+| All | [Backend API Contracts](/specs/backend-api-contracts) | All 14 endpoints; offline-capable endpoints |
+| All | [Database Schema](/specs/database-schema) | All 5 tables; versioning for conflict handling |
+| All | [Offline Support Architecture](/specs/offline-support-architecture) | Complete offline design; queuing implementation guide |
+| All | [Blocker Resolution Index](/specs/BLOCKER-RESOLUTION-INDEX) | All 6 Sprint 0 blockers resolved |
+| All | [System Constitution](/constitution/system-constitution) | Design principles (reliability, transparency) |
+| Backend | [Batch Sync Endpoint Spec](/specs/offline-support-architecture#batch-sync-endpoint) | API contract for sync requests |
+| Backend | [Conflict Resolution Policy](/constitution/INVARIANTS.md) | Rules for resolving conflicts |
+| Frontend | [Queue Data Structure Design](/roadmap/sprint_5) | IndexedDB schema and queue operations |
+| Frontend | [Sync Worker Implementation Guide](/roadmap/sprint_5) | Retry logic, backoff intervals, error handling |
+| Frontend | [Tone Guidelines](/language/tone-guidelines) | Copy standards for queue/sync messaging |
+| QA | [Offline Sync Test Plan](/roadmap/sprint_5) | Detailed test scenarios (per phase) |
+| QA | [Language Compliance](/language/forbidden-language) | Words/phrases to avoid in queue messages |
+
+---
+
+## Decision Tracking
+
+| Decision | Owner | Status | Notes | Last Updated |
+|----------|-------|--------|-------|---------------|
+| **Sprint 0 Foundations (All Resolved)** | Architecture | 🟢 | |
+| API Contract | Backend | 🟢 | [Complete Spec](/specs/backend-api-contracts) - Includes offline & sync support |
+| Database Schema | DB | 🟢 | [Complete Spec](/specs/database-schema) - Supports versioning for conflicts |
+| Auth Architecture | Security | 🟢 | [Complete Spec](/specs/authentication-architecture) - User identity for offline tracking |
+| **Offline Support** | Product | 🟢 | [Complete Spec](/specs/offline-support-architecture) - Sprint 5 implements queuing per spec |
+| Region Scope | Ops | 🟢 | [Complete Spec](/specs/region-scope-architecture) - Queue scoped by region |
+| Crisis/Management Modes | Product | 🟢 | [Complete Spec](/specs/crisis-management-mode-strategy) - Offline queue in Crisis Mode |
+| **Sprint 5 Specific Decisions** | | | |
+| Conflict Resolution Policy (LWW vs. Server-Auth) | Backend Lead | ⏳ | Per B4 spec; final design in Phase 1 |
+| Queue Persistence Strategy (IndexedDB vs. LocalStorage) | Frontend Lead | ⏳ | Capacity & reliability needs |
+| Auto-Sync Trigger (on reconnect, periodic, manual) | Product | ⏳ | UX & data consumption trade-off |
+| Max Queue Size Limit | Backend Lead | ⏳ | Storage & perf constraints |
+| Audit Logging for Sync Events | Ops Lead |  🟢 | Compliance & debugging requirement |
+
+---
+
+## Common Questions
+
+**Q: What happens if the user closes the browser during sync?**  
+A: Sync pauses. On next open, the queue rehydrates from IndexedDB, and sync resumes. Idempotency on the backend ensures no duplicates.
+
+**Q: Will users see the same item queued twice if they submit offline then edit before sync?**  
+A: No. The queue tracks unique dispatch IDs. A second edit to the same dispatch either updates the queued item or is queued separately (design clarified in Phase 1).
+
+**Q: Can a user submit offline, get online, see the synced item, then go offline and undo it?**  
+A: No. Once synced and cleared from queue, the item is on the server. The offline queue only handles pre-sync drafts. Undo is a future feature (not in scope).
+
+**Q: How will users know if a conflict happened?**  
+A: Conflict policy determines UI treatment. If server-authoritative, user may see a subtle "merged with latest updates" message. If LWW, conflict is silent unless we add opt-in conflict viewing (design TBD in Phase 3).
+
+**Q: Will sync block the UI?**  
+A: No. Sync worker runs in a background Service Worker (or background task). UI remains responsive. Status updates are non-blocking.
+
+---
+
+## Go/No-Go Checklist
+
+- [ ] **Sprint 0 Complete:** All 6 blockers resolved and documented ([Blocker Index](/specs/BLOCKER-RESOLUTION-INDEX))
+- [ ] **Sprint 1 Complete:** Intake form deployed; dispatch records created and persisted
+- [ ] **Sprint 2 Complete:** Active dispatch list/detail views deployed and accessible
+- [ ] **Sprint 3 Complete:** Responder signaling and notifications operational
+- [ ] **Sprint 4 Complete:** Draft persistence, retry infrastructure, error logging working
+- [ ] **Backend API:** Batch sync endpoint spec approved and API team committed to delivery
+- [ ] **Conflict Policy:** Decision finalized (LWW or server-authoritative) and documented per [Offline Spec](/specs/offline-support-architecture)
+- [ ] **Queue Design:** Data structure and storage strategy validated for target queue size
+- [ ] **Test Infrastructure:** Mock API and IndexedDB test utilities ready
+- [ ] **Language Review:** All sync/queue messaging copy reviewed against tone guidelines ([Tone Guidelines](/language/tone-guidelines))
+- [ ] **Browser Support:** Service Worker or alternate sync mechanism confirmed compatible with target browsers
+- [ ] **Accessibility:** Queue UI mockups reviewed for WCAG 2.1 AA compliance
+- [ ] **Risk Mitigation:** Data loss, duplicate, and conflict scenarios understood and mitigation strategies documented
+
+---
+
+## Sprint Timeline
+
+```
+Phase 1 (Queue Design & Persistence)
+├─ Task: Backend finalizes sync endpoint spec
+├─ Task: Frontend designs queue data structure
+├─ Task: IndexedDB persistence implementation
+└─ Task: Queue UI mockup & initial component
+
+Phase 2 (Sync Worker)
+├─ Task: Sync worker backbone (online detect, retry loop)
+├─ Task: Integration with frontend state & mock API
+└─ Task: Performance testing & backoff tuning
+
+Phase 3 (Conflict Handling)
+├─ Task: Conflict policy final spec & backend implementation
+├─ Task: Frontend conflict detection & resolution logic
+├─ Task: Comprehensive conflict scenario testing
+└─ Task: Edge case discovery & fixes
+
+Phase 4 (UI & Transparency)
+├─ Task: Status badges, progress indicators, manual retry UI
+├─ Task: Copy finalization & copy audit
+├─ Task: E2E testing & integration
+└─ Task: Sprint review & retrospective
+```
+
+---
+
+## Follow-On Enablement
+- Later guardrail/audit work can log sync events and conflicts.
+- Notification and responder flows can assume intake is reliable even with poor connectivity.
+- Future regional deployments can rely on the same offline pattern without rework.
+
+## Known Gaps or Risks
+- Conflict handling depends on backend support; mismatches could cause drops or duplicates.
+- Local storage limits may constrain queue size; monitor and cap appropriately.

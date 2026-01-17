@@ -1,0 +1,333 @@
+# Sprint 2: Active Dispatch View
+
+## Executive Summary
+**Status:** Ready for kickoff (after Sprint 0 + 1 completion)  
+**Sprint 0 Blockers:** 🟢 All 6 resolved (B1-B6: API, Schema, Auth, Offline, Regions, Modes)
+**Sprint 1 Blocker:** 🟢 Intake form complete; active dispatch records available  
+**Sprint 2 Blockers:** List/detail endpoints finalized; dispatch state taxonomy established  
+
+**Action Items:**
+- Backend: Implement paginated list endpoint (`GET /dispatches?active=true`) and single-dispatch detail endpoint
+- Frontend: Build list component with essential columns; create detail view route
+- QA: Define test scenarios for list rendering, pagination, and detail view transitions
+
+---
+
+## Sprint Intent
+- Provide a simple active-dispatch list and detail view with essential state only.
+- Ensure responders can see what needs attention without heavy filters or navigation.
+- Establish read-only UI patterns that later sprints will extend with signaling and error recovery.
+
+## Objective & Success Definition
+**Objective:** Create a transparent, minimal read interface for active dispatches that responders can scan quickly without extraneous information or complex controls.
+
+**Success is achieved when:**
+- Responders locate a relevant dispatch in < 30 seconds from page load
+- All dispatch metadata is expressed in plain language (no jargon)
+- Page structure clearly separates list from detail without page jumps
+- List and detail views are fully responsive on mobile and desktop
+
+## Framing the Unknowns
+- **API Pagination:** Will the backend support cursor-based, offset, or server-side filtering? How many records per page?
+- **Dispatch States:** What are all possible dispatch states, and which are considered "active"?
+- **Metadata Abundance:** Which fields should appear in the list vs. detail view to minimize clutter?
+- **Real-Time Updates:** Should the list auto-refresh, or does the user manually refresh?
+
+## Primary Risks & Tradeoffs
+**Risks:**
+- Pagination/filtering bugs could make dispatches undiscoverable (mitigated by starting with simple list, no client-side filters)
+- If status semantics are unclear, UI could show confusing state labels (mitigated by rigorous language review)
+- Missing or slow-loading data leaves responders uncertain (mitigated by explicit loading/error states)
+
+**Tradeoffs:**
+- **Completeness vs. Minimalism:** Showing all fields provides context but overwhelms; showing only essentials is clean but may require detail view clicks
+- **Auto-Refresh vs. Manual:** Auto-refresh keeps list current but consumes resources and adds complexity; manual refresh is simpler but users may see stale data
+
+## Phased Implementation Plan
+
+### Phase 1 (List View Foundation)
+- Build list component that fetches and displays active dispatches
+- Render essential columns only: intent, location, status, updated time
+- Implement pagination controls or "load more" affordance
+- Add loading/error/empty states with clear messaging
+
+### Phase 2 (Detail View)
+- Create detail page/route for individual dispatch at `/dispatches/[id]`
+- Wire to single-dispatch API endpoint
+- Display key metadata (intent, location, submitter, timestamp, current status)
+- Include navigation back to list; maintain scroll position if possible
+
+### Phase 3 (Responsive Design & Language)
+- Ensure mobile-first responsive design across list and detail views
+- Review all state labels and helper text against tone guidelines
+- Ensure plain language throughout; no institutional jargon
+- Test navigation flow between list and detail across device sizes
+
+## Technology Stack
+- **Framework:** React/Next.js (route for detail: `/dispatches/[id]` or modal overlay)
+- **Data Fetching:** React hooks (`useEffect`), Suspense or loader functions in Next.js
+- **State Management:** React hooks or lightweight store (avoid Redux if not needed)
+- **Styling:** CSS modules or Tailwind (match Sprint 1 patterns)
+- **API Communication:** Fetch or axios using `runtimeConfig`
+- **Responsive Design:** Mobile-first (responders may use phones in field)
+
+## Dependencies
+- **Sprint 0 Complete:** All 6 blockers resolved ([API](/specs/backend-api-contracts), [Schema](/specs/database-schema), [Auth](/specs/authentication-architecture), [Offline](/specs/offline-support-architecture), [Regions](/specs/region-scope-architecture), [Modes](/specs/crisis-management-mode-strategy))
+- **Sprint 1 Complete:** Intake form deployed; dispatch records created with intent, location, submitter, timestamp
+- **Runtime Config:** API base URL and domains configured per environment via `runtimeConfig`
+- **Auth:** Users authenticated with JWT; submitter_id and roles available from session ([Auth Spec](/specs/authentication-architecture))
+- **API Endpoints:** `GET /dispatches?active=true&limit=20&offset=0` and `GET /dispatches/:id` available and tested
+
+## Scope and Non-Scope
+**Scope:**
+- Active dispatch list with minimal columns (intent/summary, location, status, updated time).
+- Lightweight detail view for a single dispatch (include key metadata and history if available).
+- Basic empty state and loading/error states.
+- Pagination or "load more" affordance (backend-driven pagination only; no client-side filtering).
+- Responsive design supporting mobile and desktop.
+
+**Non-Scope:**
+- Notifications and responder signaling ("I'm responding") handled in Sprint 3.
+- Advanced filtering, sorting, or client-side search controls.
+- Offline caching or retry (later sprints).
+- Real-time list updates or WebSocket subscriptions.
+
+## Core Deliverables
+- List view wired to `runtimeConfig` API base for active dispatches with pagination.
+- Detail view page/route for a selected dispatch with essential fields and navigation.
+- Clear empty state ("No active dispatches") and error state with retry affordance.
+- Minimal status indicator (e.g., active/closed) matching API contract.
+- **Copy aligned with constitution language rules** (no forbidden terms; labels and states inherit Sprint 1 approved patterns).
+- Responsive layout tested on common mobile and desktop viewports.
+
+## Success Criteria
+-  Active dispatches render from the configured API; failures surface actionable errors.
+-  The list shows only essential fields; no heavy filter UI present.
+-  Selecting a dispatch loads its detail view smoothly (route transition or modal).
+-  Pagination/load more affordance functions correctly; no data duplication.
+-  Empty and error states are explicit and non-ambiguous.
+-  Responsive design verified on iPhone 12, iPad, and desktop (1440px).
+-  **Language compliance**: All view strings (status labels, empty states, errors) use plain language; no jargon or institutional terms.
+
+## Follow-On Enablement
+- Sprint 3 can add responder signaling and notifications on top of this view.
+- Later sprints can layer filters/pagination without reworking core list/detail wiring.
+- Data shown here establishes the baseline for audit and guardrail work in later sprints.
+
+## Known Gaps or Risks
+- API shape changes could affect list/detail field mapping; isolate mapping logic for quick updates.
+- If status semantics are unclear, document assumptions and revisit in later guardrail sprints.
+- Pagination performance at scale (1000+ dispatches) not tested; mitigate by server-side filtering.
+
+---
+
+## Backend Team: Phase-Based Kickoff Tasks
+
+### Phase 1 (List API)
+- [ ] Define and implement `GET /dispatches?active=true&limit=20&offset=0` endpoint
+  - Return dispatch summary: id, intent, location, status, updated_at, submitter
+  - Support offset-based pagination; document page size constraints
+  - Implement filtering for "active" status; document which states are considered active
+- [ ] Establish error contract (4xx/5xx responses with error codes and messages)
+- [ ] Add response schema documentation and example payloads
+
+### Phase 2 (Detail API)
+- [ ] Implement `GET /dispatches/:id` endpoint
+  - Return full dispatch record: all fields from list + history, notes, full metadata
+  - Document which fields are always present vs. optional
+  - Implement graceful handling for deleted/unavailable dispatches
+- [ ] Ensure detail endpoint respects same authentication/authorization as list
+
+### Phase 3 (Validation & Docs)
+- [ ] Generate OpenAPI/Swagger spec for both endpoints
+- [ ] Verify pagination contract: test with 0, 1, 50, and 1000+ records
+- [ ] Document any rate limiting or caching strategy
+- [ ] Provide test data fixtures for QA and frontend development
+
+---
+
+## Frontend Team: Phase-Based Kickoff Tasks
+
+### Phase 1 (List Component)
+- [ ] Create `DispatchList` component fetching from `GET /dispatches?active=true`
+  - Use Next.js loader function or `useEffect` for data fetching
+  - Render table/list with columns: Intent, Location, Status, Updated
+  - Implement loading state (skeleton or spinner)
+  - Implement error state (actionable message + retry button)
+  - Implement empty state ("No active dispatches")
+- [ ] Add pagination controls (next/previous buttons or load more)
+- [ ] Ensure list fits mobile viewport (horizontal scroll or responsive card layout)
+
+### Phase 2 (Detail View & Routing)
+- [ ] Create `DispatchDetail` component and `/dispatches/[id]` route
+  - Fetch dispatch details from `GET /dispatches/:id`
+  - Display key fields: intent, location, submitter, timestamp, status, and any available history
+  - Add back button or breadcrumb to return to list
+  - Preserve list scroll position when returning (if possible)
+- [ ] Implement loading and error states for detail view
+- [ ] Add responsive layout for detail view (stack vertically on mobile)
+
+### Phase 3 (Responsive & Language)
+- [ ] Test list and detail on iPhone 12, iPad, and desktop (1440px)
+  - Adjust padding, font sizes, and column widths for each viewport
+  - Ensure touch targets are >= 44px on mobile
+- [ ] Review all label text against `/language/tone-guidelines`
+  - Replace any jargon with plain language
+  - Verify status labels are non-ambiguous
+- [ ] Test navigation flow: list → detail → back to list (5+ round trips)
+
+---
+
+## QA Team: Test Plan per Phase
+
+### Phase 1 (List Rendering)
+**Scenarios:**
+- [ ] List loads successfully with 5+ dispatches
+- [ ] List displays correct columns: Intent, Location, Status, Updated
+- [ ] Intent text renders fully (no truncation); location is readable
+- [ ] Status values match API contract (e.g., "Active", "Pending", "Closed")
+- [ ] Updated timestamp is readable and correctly formatted
+- [ ] Empty state displays when API returns zero records
+- [ ] Loading state appears while fetching; clears when data arrives
+- [ ] Error state appears on API failure (500, timeout); shows retry button
+- [ ] Retry button re-fetches and displays updated data
+
+### Phase 2 (Pagination)
+**Scenarios:**
+- [ ] "Next" button appears when more records exist; disabled when at end
+- [ ] Clicking "Next" fetches next page; shows loading state during fetch
+- [ ] Page number or "load more" indicator reflects current position
+- [ ] Pagination works with 5 records, 50 records, and 1000+ records
+- [ ] Going back and forward maintains data consistency (no duplicates, no gaps)
+
+### Phase 3 (Detail View)
+**Scenarios:**
+- [ ] Clicking a dispatch row navigates to detail view
+- [ ] Detail view displays all expected fields: intent, location, submitter, timestamp, status
+- [ ] Detail view matches mobile and desktop layouts
+- [ ] Back button returns to list (scroll position preserved if possible)
+- [ ] Refreshing detail view re-fetches and displays current data
+- [ ] 404 or error message appears if dispatch ID is invalid
+- [ ] Detail page loads in under 2 seconds on 4G connection (simulated)
+
+### Phase 4 (Language Compliance)
+**Scenarios:**
+- [ ] All status labels use plain language (no jargon)
+- [ ] Empty state message is clear and non-intimidating
+- [ ] Error messages guide user toward action (retry, refresh)
+- [ ] No forbidden terms appear in labels or messages (check against `/language/forbidden-language`)
+- [ ] Tone is reassuring and respectful (per `/language/tone-guidelines`)
+
+### Phase 5 (Responsive Design)
+**Scenarios:**
+- [ ] List renders correctly on iPhone 12 (390px width)
+- [ ] List renders correctly on iPad (768px width)
+- [ ] List renders correctly on desktop (1440px width)
+- [ ] Touch targets (buttons, rows) are >= 44px on mobile
+- [ ] Text is readable on all devices (no tiny font sizes)
+- [ ] No horizontal scroll required on mobile (unless intentional card layout)
+
+---
+
+## Documentation Quick Links
+
+| Role | Document | Purpose |
+|------|----------|---------|
+| All | [Backend API Contracts](/specs/backend-api-contracts) | All 14 endpoints; list/detail endpoint details |
+| All | [Database Schema](/specs/database-schema) | All 5 tables; dispatch table with list/detail fields |
+| All | [Authentication Architecture](/specs/authentication-architecture) | JWT, roles, multi-region isolation |
+| All | [Blocker Resolution Index](/specs/BLOCKER-RESOLUTION-INDEX) | All 6 Sprint 0 blockers resolved |
+| Backend | [Minimal Dispatch Flow](/specs/minimal-dispatch-flow) | UX flow for list/detail views |
+| Backend | [System Constitution](/constitution/system-constitution) | Design principles (simplification, plainness) |
+| Frontend | [Tone Guidelines](/language/tone-guidelines) | Language standards for labels and messages |
+| Frontend | [Forbidden Language](/language/forbidden-language) | Words/phrases to avoid |
+| Frontend | [Sprint 1 Implementation](/roadmap/sprint_1/sprint_1.mdx) | Reusable component patterns |
+| QA | [Language Compliance](/language/forbidden-language) | Words/phrases to avoid |
+
+---
+
+## Decision Tracking
+
+| Decision | Status | Owner | Notes |
+|----------|--------|-------|-------|
+| **Sprint 0 Foundations (All Resolved)** | 🟢 | Architecture | |
+| API Contract | 🟢 | Backend | [Complete Spec](/specs/backend-api-contracts) - 14 endpoints finalized |
+| Database Schema | 🟢 | DB | [Complete Spec](/specs/database-schema) - 5 tables with dispatch table supporting list/detail |
+| Auth Architecture | 🟢 | Security | [Complete Spec](/specs/authentication-architecture) - JWT, 3 roles, multi-region isolation |
+| Offline Support | 🟢 | Product | [Complete Spec](/specs/offline-support-architecture) - Queuing in Sprint 5; Sprint 2 assumes network |
+| Region Scope | 🟢 | Ops | [Complete Spec](/specs/region-scope-architecture) - 3 initial US regions |
+| Crisis/Management Modes | 🟢 | Product | [Complete Spec](/specs/crisis-management-mode-strategy) - List/detail in Crisis Mode |
+| **Sprint 2 Specific Decisions** | | | |
+| Pagination Strategy (offset vs. cursor) | 🟢|  Backend | Using offset-based pagination; limit = 20 per page ([API Spec](/specs/backend-api-contracts#pagination--cursors)) |
+| Active Status Definition | 🟢|  Backend | States: "Active", "Pending" = active; "Closed", "Cancelled" = inactive |
+| Detail View Route vs. Modal | 🟢|  Frontend | Using `/dispatches/[id]` route; modal deferred to Sprint 3+ |
+| Mobile Responsive Approach | 🟢|  Frontend | Mobile-first design; card layout on mobile, table on desktop |
+
+---
+
+## Common Questions
+
+**Q: Will the list auto-refresh to show new dispatches?**  
+A: No. Users manually refresh the list in Sprint 2. Sprint 3 will add notification support for real-time updates.
+
+**Q: What happens if I'm on the detail view and someone updates the dispatch?**  
+A: The detail view shows stale data until you refresh. Sprint 3+ will add real-time sync.
+
+**Q: Can I filter or search dispatches in Sprint 2?**  
+A: No. Sprint 2 is read-only with no filters. Sprint 3+ may add advanced filtering.
+
+**Q: Is pagination automatic (infinite scroll) or manual (next button)?**  
+A: Manual pagination with next/previous buttons. This reduces complexity and server load.
+
+**Q: What if a dispatch is deleted while I'm viewing it?**  
+A: Detail view shows a 404 error with a link back to the list.
+
+**Q: Are list and detail views responsive on mobile?**  
+A: Yes. Both views are mobile-first and tested on iPhone 12, iPad, and desktop.
+
+---
+
+## Go/No-Go Checklist
+
+**Readiness Assessment:**
+
+- [ ] **Sprint 0 Complete:** All 6 blockers resolved and documented ([Blocker Index](/specs/BLOCKER-RESOLUTION-INDEX))
+- [ ] **Sprint 1 Complete:** Intake form deployed; dispatch records created and persisted
+- [ ] API endpoints for list and detail are implemented and tested
+- [ ] Backend team has provided OpenAPI spec and example responses
+- [ ] Frontend team has access to API base URL via `runtimeConfig`
+- [ ] QA team has test data fixtures (5+, 50, 1000+ dispatches)
+- [ ] Design mockups approved for mobile and desktop layouts
+- [ ] Language guidelines reviewed; no forbidden terms in copy ([Forbidden Language](/language/forbidden-language))
+- [ ] Tone guidelines applied to error/empty states ([Tone Guidelines](/language/tone-guidelines))
+- [ ] CI/CD pipeline can build and test frontend code
+- [ ] Staging environment mirrors production API contract
+- [ ] Team has agreed on pagination strategy and page size
+
+**Go Decision:** Proceed only if all items above are checked and signed off by Backend, Frontend, and QA leads.
+
+---
+
+## Sprint Timeline
+
+```
+Phase 1: List View Foundation
+├─ Backend: Implement list endpoint
+├─ Frontend: Build DispatchList component & pagination
+└─ QA: Define test scenarios, prepare fixtures
+
+Phase 2: Detail View
+├─ Backend: Implement detail endpoint & docs
+├─ Frontend: Build DispatchDetail route & navigation
+└─ QA: Execute list/pagination tests; begin detail tests
+
+Phase 3: Polish & Language
+├─ Backend: Finalize API docs; support final edge cases
+├─ Frontend: Responsive design; language review
+└─ QA: Complete all test scenarios; language compliance check
+
+Phase 4: Integration & Sign-Off
+├─ All: Run end-to-end tests across environments
+├─ All: Verify Go/No-Go checklist
+└─ All: Sprint completion review & debrief
+```

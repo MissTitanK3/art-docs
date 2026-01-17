@@ -1,0 +1,81 @@
+# Roadmap Overview
+
+## Purpose of the Roadmap
+
+This roadmap documents feature-based sprints for the Region Dispatch System. It captures how capabilities are sequenced so each sprint unblocks or stabilizes the next. The audience is future contributors and reviewers who need to understand intent, dependencies, and what is considered complete before moving forward.
+
+## How Feature-Based Sprints Work
+
+Sprints are defined by the capability they deliver, not by dates. A sprint completes when its capability is stable enough to be assumed by later work. Each sprint documents intent, explicit scope, exclusions, deliverables, success criteria, and the enablement it provides. Timelines, estimates, and motivational framing are omitted in favor of clear invariants and completion conditions.
+
+## Sprint Dependencies and Flow
+
+Sprints are dependency-driven. Each sprint either:
+- Unlocks a new capability required by later sprints, or
+- Stabilizes an existing capability to remove risk for later sprints.
+
+Dependencies must be explicit: what this sprint relies on, what breaks if assumptions change, and what later work can now assume. Forward momentum comes from finishing the minimum needed for the next sprint to proceed without revisiting resolved decisions.
+
+## Handling Scope Expansion and Tangents
+
+When a sprint uncovers a tangent, risk, or focused design need, add a sub-document beside the sprint file and link to it from the parent. Sub-documents address a single concern without redefining sprint intent. They state why they exist separately, the problem being resolved, design or implementation details, and any new constraints. Revisions to a sprint are documented explicitly rather than rewriting history.
+
+## Sprint Document Structure
+
+Each sprint document includes the following sections to ensure clarity, risk awareness, implementation readiness, and team-specific guidance:
+
+- **Executive Summary** - Current status, blockers resolved, immediate action items
+- **Sprint Intent** - Core capability and phased approach being delivered
+- **Objective & Success Definition** - Clear success metrics and measurable outcomes
+- **Team-Specific Sections** (Backend, Frontend, QA, etc.) - Concrete kickoff tasks, test plans, and acceptance criteria per role
+- **Framing the Unknowns** - Explicit assumptions and pending decisions to resolve before work begins
+- **Primary Risks & Tradeoffs** - What could go wrong and deliberate design choices made
+- **Phased Implementation Plan** - Concrete phases to execute within the sprint (not dates, but sequencing)
+- **Technology Stack** - Frameworks, libraries, and tooling decisions for this sprint's work
+- **Dependencies** - What this sprint requires from prior work or external systems
+- **Scope and Non-Scope** - Clear boundaries to prevent scope creep
+- **Core Deliverables** - Tangible outputs (code, docs, patterns)
+- **Success Criteria** - Binary completion checklist
+- **Follow-On Enablement** - What future sprints can assume after this sprint completes
+- **Known Gaps or Risks** - Open questions and mitigation strategies
+- **Documentation Quick Links** - Navigation to key implementation guides and decision tracking
+- **Decision Tracking** - Blocker status, owner, and decision reference
+- **Common Questions** - FAQ addressing anticipated concerns about scope, assumptions, and dependencies
+- **Go/No-Go Checklist** - Binary assessment of readiness before kickoff
+- **Sprint Timeline** - Phase-based sequencing (not calendar-based dates)
+
+Use this structure to assess sprint readiness: if "Framing the Unknowns" items need stakeholder alignment, resolve them before starting. If risks aren't mitigated, adjust scope or add buffering.
+
+## How to Use This Roadmap Day-to-Day
+
+- **Before starting a sprint:** Review Objective, Framing the Unknowns, and Phased Implementation Plan to confirm readiness and resolve pending decisions.
+- **During a sprint:** Use Success Criteria and Deliverables as the completion checklist. If new unknowns emerge, document in Known Gaps for follow-up sprints.
+- **When scope shifts:** Check if it fits the Phased Implementation Plan phases. If not, it likely warrants a sub-document alongside the sprint (per the Handling Scope Expansion section above).
+- **After a sprint:** Record resolution of "Framing the Unknowns" items and update Follow-On Enablement for downstream teams so they don't re-litigate settled choices.
+- **Cross-sprint dependencies:** Use the Dependencies section to cascade assumptions and identify critical path blockers.
+
+## Planned Feature Sprints (High-Level)
+
+| Sprint | Status | Capability Focus | Outcome Assumed by Later Sprints |
+| --- | --- | --- | --- |
+| [Sprint 0: Config & Constitution Alignment](/roadmap/sprints/sprint_0) | [ ] | Establish environment/runtime config for domains and APIs, wire `web` to the Region Dispatch System constitution in `index.mdx`, and document required env vars and invariants. | All later sprints assume a single-source config pattern, correct domains/DB endpoints per environment, and shared language/invariant references from the constitution. |
+| [Sprint 1: Minimal Intake](/roadmap/sprints/sprint_1) | [ ] | Single-screen intake capturing intent, location, submitter, and timestamp with clear defaults **and constitution-aligned copy**. | Baseline dispatch records exist with approved language patterns that later flows inherit. |
+| [Sprint 2: Active Dispatch View](/roadmap/sprints/sprint_2) | [ ] | Simple active dispatch list with essential state and detail view; no heavy filters, **language-checked copy**. | Responders can see what needs attention without extra tooling or institutional language. |
+| [Sprint 3: Responder Signals & Notifications](/roadmap/sprints/sprint_3) | [ ] | "I'm responding" signal, notifications to available responders, basic acknowledgment loop, **and tone-checked messaging**. | Downstream work can assume responders are reachable, can claim/respond, and receive clear non-intimidating messages. |
+| [Sprint 4: Failure Visibility & Recovery](/roadmap/sprints/sprint_4) | [ ] | Draft autosave, submission retry, and clear error states; includes minimal logging for triage. | Later features can assume user work is not lost and errors are surfaced. |
+| [Sprint 5: Offline & Sync Guarantees](/roadmap/sprints/sprint_5) | [ ] | Offline submission queueing with eventual sync, conflict handling rules, and status display. | Future work can rely on consistent data capture despite intermittent connectivity. |
+| [Sprint 6: Language & UX Guardrails](/roadmap/sprints/sprint_6) | [ ] | Comprehensive audit of tone/forbidden language, simplify copy, remove harmful defaults, and establish reusable pattern library. | Subsequent UI changes inherit consistent language patterns and reduced cognitive load without re-auditing. |
+| [Sprint 7: Operational Guardrails & Auditability](/roadmap/sprints/sprint_7) | [ ] | Invariants enforcement, audit trails, and compliance hooks for dispatch changes. | Automation and reporting can assume trustworthy state transitions and traceability. |
+
+---
+
+### Diving Deeper into Each Sprint
+
+The table above provides a high-level overview. Each sprint document is comprehensive and includes decision guidance, risk analysis, and implementation sequencing. Click any sprint title to view:
+
+- **Unknown variables** that need stakeholder alignment before work begins
+- **Risk breakdown** with specific mitigations (e.g., offline sync strategy, conflict resolution policy)
+- **Phased sequencing** so implementation doesn't require guesswork
+- **Technology recommendations** and decision points (e.g., "polling vs. WebSocket" for real-time updates)
+
+Sprints are designed to be **decision-ready**: teams should be able to read a sprint, identify open questions in "Framing the Unknowns," resolve them with stakeholders, and begin execution with clarity.

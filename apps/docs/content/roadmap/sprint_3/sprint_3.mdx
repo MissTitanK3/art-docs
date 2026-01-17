@@ -1,0 +1,363 @@
+# Sprint 3: Responder Signals & Notifications
+
+## Executive Summary
+**Status:** Ready for kickoff (after Sprint 0, 1, 2 completion)  
+**Sprint 0 Blockers:** 🟢 All 6 resolved (B1-B6: API, Schema, Auth, Offline, Regions, Modes)
+**Sprint 1 Blocker:** 🟢 Intake form complete; dispatch records created  
+**Sprint 2 Blocker:** 🟢 Active dispatch list/detail views available  
+**Sprint 3 Blockers:** Responder identification finalized; notification delivery mechanism selected  
+
+**Action Items:**
+- Backend: Implement responder status API endpoint (`POST /dispatches/:id/responder-status`, `GET /dispatches/:id/responders`) and notification triggers
+- Frontend: Build "I'm responding" button and responder status display with polling
+- QA: Test button action, status updates, notification delivery, concurrent responder scenarios
+
+---
+
+## Sprint Intent
+- Enable responders to signal "I'm responding" and receive basic notifications for active dispatches.
+- Provide an acknowledgment loop so dispatch state changes propagate to responders with minimal friction.
+- Establish two-way communication patterns for future escalation and coordination.
+
+## Objective & Success Definition
+**Objective:** Create a bi-directional communication channel between responders and the system so dispatch acknowledgment and status updates are immediate, clear, and non-intrusive.
+
+**Success is achieved when:**
+- Responders can claim a dispatch with one action; UI updates reflect their status within 1 second
+- Notifications reach responders reliably; failures are visible and recoverable
+- Responder status is current in the shared dispatch detail view
+- Multiple responders can signal on the same dispatch without collisions
+
+## Framing the Unknowns
+- **Notification Delivery:** What transport (push, email, SMS, in-app)? Will backend provide a notification service?
+- **Responder Uniqueness:** How are responders identified—user ID, session token, or something else?
+- **Concurrency:** Can multiple responders claim the same dispatch? Should the system prevent duplicates or allow coordination?
+- **Status Lifecycle:** What are all possible responder statuses (e.g., "responding", "arrived", "assisting", "cleared")?
+- **Notification Persistence:** Should notifications persist in-app or only be sent externally?
+
+## Primary Risks & Tradeoffs
+**Risks:**
+- Notification delivery may be unreliable (mitigated by graceful error handling and retry)
+- Race conditions if multiple responders update simultaneously (mitigated by documenting conflict policy)
+- Ambiguous wording in notifications could confuse responders (mitigated by tone/language review)
+
+**Tradeoffs:**
+- **Immediacy vs. Reliability:** Push notifications are fast but may not deliver; polling is reliable but adds latency and server load
+- **Single-Status vs. Rich Status:** Simple "responding" status is minimal but loses nuance; rich statuses are informative but add complexity
+
+## Phased Implementation Plan
+
+### Phase 1 (Responder Action)
+- Add "I'm responding" button to dispatch detail view
+- Wire button to responder status update API
+- Show success/failure feedback (toast/banner)
+- Disable button after successful click (prevent double-submit)
+
+### Phase 2 (Notification System)
+- Implement notification trigger (based on API contract)
+- Handle delivery success/failure
+- Display errors to user with next steps
+- Log notification delivery attempts for debugging
+
+### Phase 3 (Status Reflection)
+- Query responder status from API
+- Display current responder(s) in dispatch detail
+- Auto-refresh or use polling to keep status current
+- Show responder names/IDs and status timestamps
+
+### Phase 4 (Language & Testing)
+- Review notification copy for tone and clarity
+- Test all combinations (success, failures, concurrent updates)
+- Verify responder can see their own status and others' statuses
+- Verify language compliance across all notification copy
+
+## Technology Stack
+- **Framework:** React/Next.js
+- **Notifications:** Depends on backend (Firebase Cloud Messaging, Twilio, custom service)
+- **Real-Time Status:** Polling interval (15-30 seconds) or WebSocket (if backend supports)
+- **API Communication:** Fetch/axios using `runtimeConfig`
+- **State Management:** React hooks or lightweight store
+- **Error Handling:** User-visible error boundaries with recovery paths
+- **Testing:** Unit tests for status transitions; integration tests for API calls
+
+## Dependencies
+- **Sprint 0 Complete:** All 6 blockers resolved ([API](/specs/backend-api-contracts), [Schema](/specs/database-schema), [Auth](/specs/authentication-architecture), [Offline](/specs/offline-support-architecture), [Regions](/specs/region-scope-architecture), [Modes](/specs/crisis-management-mode-strategy))
+- **Sprint 1 Complete:** Intake form deployed; dispatch records created with submitter_id, intent, location, timestamp
+- **Sprint 2 Complete:** Active dispatch list/detail views deployed; users can view dispatches and drill into details
+- **Runtime Config:** API base URL and authentication configured ([Runtime Config](/turbo/apps/web/config/runtime.ts))
+- **Auth:** Users authenticated with JWT; user ID available from session for responder identification ([Auth Spec](/specs/authentication-architecture))
+- **API Endpoints:** `POST /dispatches/:id/responder-status` and `GET /dispatches/:id/responders` available and tested
+
+## Scope and Non-Scope
+**Scope:**
+- "I'm responding" action on active dispatches with visible acknowledgment.
+- Send minimal notifications to available responders (delivery channel as defined by current API).
+- Reflect responder status in the active dispatch detail view.
+- Basic error states for failed notifications or status updates.
+- Responder name/ID and timestamp displayed for status context.
+
+**Non-Scope:**
+- Complex notification preferences or schedules.
+- Multi-channel escalation logic or advanced routing.
+- Offline queueing of signals (later sprints handle offline).
+- Responder location or availability detection.
+
+## Core Deliverables
+- UI control to mark "I'm responding" on an active dispatch and update status via the API.
+- Notification trigger wired to the configured API base; shows success/failure feedback.
+- Active dispatch detail displays current responder(s) and their status.
+- Polling mechanism to refresh responder status every 15-30 seconds (or WebSocket if supported).
+- **Copy adheres to language/tone guidelines**; avoids intimidating or ambiguous wording (notification messages and responder actions checked against `/language/tone-guidelines`).
+- Error states with clear recovery paths (retry notification, acknowledge error, refresh).
+
+## Success Criteria
+-  Responders can mark themselves on a dispatch; the UI reflects updated status within 1 second.
+-  Notifications are sent via the API; failures surface actionable errors.
+-  Responder status appears in the active dispatch detail view consistently with the API contract.
+-  Multiple responders can signal on the same dispatch without collisions or lost updates.
+-  Responder names/IDs and timestamps display for context.
+-  No new filters or complex settings introduced; minimal friction preserved.
+-  **Language compliance**: Notification messages and action labels are reassuring and clear; no fear-inducing or institutional language.
+
+## Follow-On Enablement
+- Later sprints can build richer escalation, multi-channel notifications, and preferences atop this loop.
+- Guardrail and audit work can rely on responder state changes being recorded.
+- Offline and retry work can extend the signaling path without reworking UI semantics.
+
+## Known Gaps or Risks
+- Notification transport/reliability depends on backend; document assumptions if guarantees are weak.
+- Concurrent responder updates may require conflict handling; note any race conditions for later guardrail sprints.
+- Notification delivery latency may vary by transport; set user expectations.
+
+---
+
+## Backend Team: Phase-Based Kickoff Tasks
+
+### Phase 1 (Responder Status API)
+- [ ] Define and implement `POST /dispatches/:id/responder-status` endpoint
+  - Accept responder ID and new status (e.g., "responding")
+  - Return updated status with timestamp
+  - Document error codes for invalid dispatch/responder IDs
+- [ ] Implement `GET /dispatches/:id/responders` endpoint
+  - Return list of responders and their statuses for a dispatch
+  - Include responder ID/name and timestamp for each
+  - Document ordering (most recent first?)
+
+### Phase 2 (Notification Trigger)
+- [ ] Set up notification service integration (Firebase, Twilio, or custom)
+  - Document notification payload format
+  - Configure delivery method (push, email, SMS, in-app)
+- [ ] Implement notification logic triggered by responder status updates
+  - Send notification to dispatch creator/admin when responder claims dispatch
+  - Log delivery success/failure
+- [ ] Expose notification delivery status to frontend (optional; for debugging)
+
+### Phase 3 (Validation & Docs)
+- [ ] Generate OpenAPI/Swagger spec for responder endpoints
+- [ ] Test concurrent responder updates; document conflict resolution
+- [ ] Provide example notification payloads and delivery contracts
+- [ ] Create test fixtures for various responder scenarios
+
+---
+
+## Frontend Team: Phase-Based Kickoff Tasks
+
+### Phase 1 (Responder Action Button)
+- [ ] Add "I'm responding" button to `DispatchDetail` component
+  - Fetch current responder status on detail load
+  - Button shows current status (e.g., "Mark as responding")
+  - On click, call `POST /dispatches/:id/responder-status`
+  - Show loading state and disable button during request
+- [ ] Implement success feedback (toast/banner)
+  - Message: "Status updated" or similar
+  - Auto-dismiss after 3 seconds
+- [ ] Implement error feedback (toast/banner)
+  - Show actionable error message
+  - Offer retry button if transient error
+
+### Phase 2 (Responder Status Display)
+- [ ] Create `ResponderStatusList` component
+  - Fetch from `GET /dispatches/:id/responders`
+  - Display responder ID/name and status
+  - Show timestamp of last status update
+  - Use polling (15-30 second interval) or WebSocket to keep fresh
+- [ ] Add responder status section to dispatch detail view
+  - Place visibly near "I'm responding" button
+  - Update in real-time without full page reload
+
+### Phase 3 (Notification Handling)
+- [ ] Integrate with backend notification service (if in-app notifications supported)
+  - Display in-app notifications (toast or banner)
+  - Log received notifications locally (for debugging)
+- [ ] Handle notification delivery failures gracefully
+  - Show error message: "Could not send notification"
+  - Offer retry affordance
+
+### Phase 4 (Language & Testing)
+- [ ] Review all notification copy against `/language/tone-guidelines`
+  - Ensure messages are clear and reassuring
+  - Remove any institutional language
+- [ ] Test notification delivery: happy path, errors, concurrent responders
+- [ ] Test status updates reflected in detail view within 30 seconds (polling)
+
+---
+
+## QA Team: Test Plan per Phase
+
+### Phase 1 (Button Action Flow)
+**Scenarios:**
+- [ ] "I'm responding" button appears on dispatch detail view
+- [ ] Clicking button shows loading state (spinner or disabled state)
+- [ ] Button sends request to `POST /dispatches/:id/responder-status`
+- [ ] Success response shows confirmation toast ("Status updated")
+- [ ] Button re-enables after success; reflects new status
+- [ ] Error response shows actionable error message with retry button
+- [ ] Retry button resends request and succeeds on second attempt
+- [ ] Button prevents double-submit while request in flight
+
+### Phase 2 (Status Updates & Display)
+**Scenarios:**
+- [ ] Responder list appears on dispatch detail with current responders
+- [ ] Each responder shows: ID/name, status, timestamp
+- [ ] Responder list updates automatically every 15-30 seconds (polling)
+- [ ] After marking "I'm responding", responder appears in list within 30 seconds
+- [ ] Multiple responders can mark "responding"; all appear in list (no collision)
+- [ ] Responder status changes reflect new timestamps
+
+### Phase 3 (Notification Delivery)
+**Scenarios:**
+- [ ] Notification sent when responder marks "responding"
+- [ ] Dispatch creator/admin receives notification (transport-specific)
+- [ ] Failed notification shows error message with retry affordance
+- [ ] Retry button resends notification successfully
+- [ ] In-app notification displays and auto-dismisses within 5 seconds
+- [ ] Multiple responders trigger notifications independently
+
+### Phase 4 (Concurrent Responder Scenarios)
+**Scenarios:**
+- [ ] Two responders mark "responding" simultaneously; both appear in list
+- [ ] Responder A marks "responding"; responder B sees A in list within 30 seconds
+- [ ] If responder A updates status while B marks "responding", no data loss
+- [ ] Status list reflects all responders; no duplicates or missing entries
+
+### Phase 5 (Language Compliance)
+**Scenarios:**
+- [ ] Button label uses plain language ("I'm responding" or similar)
+- [ ] Notification messages are clear and reassuring
+- [ ] Error messages guide user toward action (retry, dismiss)
+- [ ] No forbidden terms or institutional language in notifications
+- [ ] Tone is respectful and non-intimidating (per `/language/tone-guidelines`)
+
+### Phase 6 (Error Recovery)
+**Scenarios:**
+- [ ] Network error on status update shows retry affordance
+- [ ] Notification delivery fails; error message and retry button appear
+- [ ] Retry succeeds after transient failure
+- [ ] Responder can dismiss error and continue using app
+
+---
+
+## Documentation Quick Links
+
+| Role | Document | Purpose |
+|------|----------|----------|
+| All | [Backend API Contracts](/specs/backend-api-contracts) | All 14 endpoints including responder status |
+| All | [Database Schema](/specs/database-schema) | All 5 tables; responders table with status |
+| All | [Authentication Architecture](/specs/authentication-architecture) | User identification for responder tracking |
+| All | [Blocker Resolution Index](/specs/BLOCKER-RESOLUTION-INDEX) | All 6 Sprint 0 blockers resolved |
+| Backend | [Minimal Dispatch Flow](/specs/minimal-dispatch-flow) | Responder signal UX flow |
+| Backend | [System Constitution](/constitution/system-constitution) | Design principles |
+| Frontend | [Tone Guidelines](/language/tone-guidelines) | Language standards for button labels and notifications |
+| Frontend | [Forbidden Language](/language/forbidden-language) | Terms to avoid in notifications |
+| Frontend | [Sprint 2 Implementation](/roadmap/sprint_2/sprint_2.mdx) | Reusable component patterns |
+| QA | [Language Compliance](/language/forbidden-language) | Words/phrases to avoid |
+
+---
+
+## Decision Tracking
+
+| Decision | Status | Owner | Notes |
+|----------|--------|-------|-------|
+| **Sprint 0 Foundations (All Resolved)** | 🟢 | Architecture | |
+| API Contract | 🟢 | Backend | [Complete Spec](/specs/backend-api-contracts) - Includes responder status endpoints |
+| Database Schema | 🟢 | DB | [Complete Spec](/specs/database-schema) - Responders table with status tracking |
+| Auth Architecture | 🟢 | Security | [Complete Spec](/specs/authentication-architecture) - User identification for responder tracking |
+| Offline Support | 🟢 | Product | [Complete Spec](/specs/offline-support-architecture) - Sprint 3 assumes network; queuing in Sprint 5 |
+| Region Scope | 🟢 | Ops | [Complete Spec](/specs/region-scope-architecture) - Responders scoped by region |
+| Crisis/Management Modes | 🟢 | Product | [Complete Spec](/specs/crisis-management-mode-strategy) - Responder actions in Crisis Mode |
+| **Sprint 3 Specific Decisions** | | | |
+| Responder Identification | 🟢|  Backend | Using user session ID; fallback to token if needed ([Auth Spec](/specs/authentication-architecture)) |
+| Notification Transport | 🟢|  Backend | Push + email; SMS deferred to Sprint 4+ |
+| Status Sync Method | 🟢|  Frontend | Polling every 20 seconds; WebSocket deferred to Sprint 5+ |
+| Button Placement | 🟢|  Frontend | Prominent button in dispatch detail header |
+| Error Handling | 🟢|  Both | User-visible errors with retry; log failures for audit |
+
+---
+
+## Common Questions
+
+**Q: What happens if multiple responders mark "I'm responding" on the same dispatch?**  
+A: All responders' statuses are tracked and displayed. The system allows coordination (deferred to future sprints for assignment logic).
+
+**Q: Will I be notified when someone else marks "responding"?**  
+A: No. Sprint 3 only notifies dispatch creator/admin. Sprint 4+ can add peer notifications.
+
+**Q: Can I change my status after marking "responding"?**  
+A: Not in Sprint 3. Sprint 4+ will add status transitions (e.g., "responding" → "arrived" → "assisting").
+
+**Q: How often does the responder list update?**  
+A: Every 15-30 seconds via polling. This reduces server load; WebSocket real-time updates deferred to later sprints.
+
+**Q: What if the notification service is down?**  
+A: Frontend shows an error with retry affordance. Status is still recorded; notification can be resent.
+
+**Q: Are notifications persistent (in-app) or external only?**  
+A: This sprint focuses on external notifications (push/email). In-app notification persistence deferred.
+
+---
+
+## Go/No-Go Checklist
+
+**Readiness Assessment:**
+
+- [ ] **Sprint 0 Complete:** All 6 blockers resolved and documented ([Blocker Index](/specs/BLOCKER-RESOLUTION-INDEX))
+- [ ] **Sprint 1 Complete:** Intake form deployed; dispatch records created and persisted
+- [ ] **Sprint 2 Complete:** Active dispatch list/detail views deployed and accessible
+- [ ] Responder identification method finalized and tested (session ID, token, or API contract)
+- [ ] Notification service configured and tested (Firebase, Twilio, or custom)
+- [ ] Backend endpoints for status and responder list implemented and documented
+- [ ] Frontend has access to responder APIs via `runtimeConfig`
+- [ ] QA has test data: multiple responders, multiple dispatches
+- [ ] Notification payloads and delivery contracts defined
+- [ ] Language reviewed: no forbidden terms in button labels or notifications ([Forbidden Language](/language/forbidden-language))
+- [ ] Tone guidelines applied to all user-facing copy ([Tone Guidelines](/language/tone-guidelines))
+- [ ] Polling interval (15-30 seconds) established and documented
+- [ ] Error scenarios (timeout, 500, invalid ID) handled gracefully
+
+**Go Decision:** Proceed only if all items above are checked and signed off by Backend, Frontend, and QA leads.
+
+---
+
+## Sprint Timeline
+
+```
+Phase 1: Responder Status API
+├─ Backend: Implement POST /responder-status and GET /responders endpoints
+├─ Frontend: Add "I'm responding" button to detail view
+└─ QA: Define test scenarios
+
+Phase 2: Notifications
+├─ Backend: Set up notification service; implement delivery logic
+├─ Frontend: Add success/error feedback; integrate notifications
+└─ QA: Test button actions, errors, retry flow
+
+Phase 3: Status Display & Polling
+├─ Backend: Document responder API contract
+├─ Frontend: Build ResponderStatusList; implement polling
+└─ QA: Test concurrent updates, status reflection
+
+Phase 4: Language & Sign-Off
+├─ All: Language compliance review
+├─ All: Test concurrent responder scenarios
+├─ All: Verify Go/No-Go checklist and sign off
+```

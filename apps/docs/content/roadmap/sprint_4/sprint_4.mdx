@@ -1,0 +1,392 @@
+# Sprint 4: Failure Visibility & Recovery
+
+## Executive Summary
+**Status:** Ready for kickoff (after Sprint 0, 1, 2, 3 completion)  
+**Sprint 0 Blockers:** 🟢 All 6 resolved (B1-B6: API, Schema, Auth, Offline, Regions, Modes)  
+**Sprint 1 Blocker:** 🟢 Intake form complete; dispatch records created  
+**Sprint 2 Blocker:** 🟢 Active dispatch list/detail views available  
+**Sprint 3 Blocker:** 🟢 Responder signaling and notifications working  
+**Sprint 4 Blockers:** Local storage schema finalized; logging endpoint secured; error handling patterns defined  
+
+**Action Items:**
+- Backend: Implement error logging endpoint (`POST /logs/client-errors`) and confirm idempotent API contracts
+- Frontend: Implement draft persistence (local storage), retry infrastructure, and error states
+- QA: Test draft restore, error recovery, retry paths, and logging validation
+
+---
+
+## Sprint Intent
+- Make submission failures visible and recoverable to prevent silent data loss.
+- Ensure user work (drafts) is not lost on transient errors and that retry paths are explicit.
+- Establish error visibility and recovery patterns for future features.
+
+## Objective & Success Definition
+**Objective:** Guarantee that no user work is lost due to transient network errors, and provide clear paths to recover and retry without retyping.
+
+**Success is achieved when:**
+- Users can recover a draft after any interruption (network, page reload, browser crash)
+- Every failed action surfaces a recovery path (retry, clear, edit)
+- Error messages guide users toward resolution, not toward frustration
+- Client errors are logged for triage and monitoring
+
+## Framing the Unknowns
+- **Draft Scope:** Should drafts be scoped per environment/region, or globally? How long should they persist?
+- **Autosave Frequency:** How often should drafts auto-save (every keystroke, on blur, periodic)?
+- **Logging Destination:** Where should client errors be logged? What data is safe to send?
+- **Retry Strategy:** Should retries be automatic, manual, or a combination (e.g., auto with backoff, then manual button)?
+- **Data Retention:** How long should drafts persist in local storage? What triggers cleanup?
+
+## Primary Risks & Tradeoffs
+**Risks:**
+- Draft storage fills local storage or persists sensitive data (mitigated by clear retention policy and data scrubbing)
+- Overly aggressive autosave could hurt performance (mitigated by debouncing and background save)
+- Retry logic could create duplicate submissions (mitigated by idempotent API calls)
+
+**Tradeoffs:**
+- **Local Storage vs. Server:** Client-side drafts work offline but don't sync across devices; server-side drafts sync but require backend implementation
+- **Autosave Frequency vs. Performance:** Frequent saves provide safety but may slow UI; infrequent saves reduce load but risk loss of recent work
+
+## Phased Implementation Plan
+
+### Phase 1 (Draft Persistence)
+- Implement local storage for intake form state
+- Auto-save on blur or periodic timer (debounced)
+- Restore draft on form mount with user confirmation
+- Display draft age/timestamp for context
+
+### Phase 2 (Retry Infrastructure)
+- Catch submission errors and display to user
+- Add retry button that re-posts with same data
+- Preserve form state across retry attempts
+- Implement basic exponential backoff for automatic retry
+
+### Phase 3 (Error States & Recovery UI)
+- Add error/retry states to intake, list, and detail views
+- Implement error recovery UI patterns (retry button, dismiss, refresh)
+- Display actionable error messages (network, server, validation)
+- Add loading/skeleton states during retries
+
+### Phase 4 (Logging & Monitoring)
+- Add lightweight error telemetry hook
+- Ensure no PII is captured
+- Send errors to configured logging endpoint
+- Test logging endpoint reliability and recovery
+
+## Technology Stack
+- **Storage:** Local Storage API (structured JSON, versioned)
+- **Autosave:** debounce from `lodash` or custom hook
+- **Error Handling:** Try/catch, user-visible error boundaries
+- **Logging:** Custom telemetry service or third-party (Sentry, LogRocket)
+- **Data Scrubbing:** Helper functions to redact PII before logging
+- **Retry Logic:** Exponential backoff helper (e.g., 1s, 2s, 4s, 8s)
+- **Testing:** Tests for draft restore, concurrent saves, storage quota
+
+## Dependencies
+- **Sprint 0 Complete:** All 6 blockers resolved ([API](/specs/backend-api-contracts), [Schema](/specs/database-schema), [Auth](/specs/authentication-architecture), [Offline](/specs/offline-support-architecture), [Regions](/specs/region-scope-architecture), [Modes](/specs/crisis-management-mode-strategy))
+- **Sprint 1 Complete:** Intake form deployed; dispatch records created with submitter_id, intent, location, timestamp
+- **Sprint 2 Complete:** Active dispatch list/detail views deployed; users can view and navigate dispatches
+- **Sprint 3 Complete:** Responder signaling working; responder status tracked; notifications operational
+- **Idempotent API:** All submission endpoints support deduplication (key-based or timestamp-based) ([API Spec](/specs/backend-api-contracts#idempotency))
+- **Error Handling:** Standardized error responses defined; all endpoints return consistent error format ([API Spec](/specs/backend-api-contracts#error-response-format))
+- **Runtime Config:** API base URL, logging endpoints configured ([Runtime Config](/turbo/apps/web/config/runtime.ts))
+- **Language Guidelines:** Tone and approved copy patterns available for error messages ([Tone Guidelines](/language/tone-guidelines), [Approved Copy](/language/approved-copy))
+
+## Scope and Non-Scope
+**Scope:**
+- Draft autosave for intake form with safe restoration.
+- Submission retry with clear error messaging and status indicators.
+- Minimal logging/telemetry hooks to surface client-side failures for triage (non-PII).
+- Error states in list/detail views so users can retry or refresh when data fails to load.
+- Error recovery UI patterns (retry button, dismiss, refresh).
+
+**Non-Scope:**
+- Full offline queueing (handled in Sprint 5).
+- Complex telemetry dashboards; only capture essentials needed for debugging.
+- Changing notification semantics or responder routing.
+- Automatic retry without user visibility (all retries show feedback).
+
+## Core Deliverables
+- Client-side draft persistence (local storage) for intake form with restore on reload and user confirmation.
+- Retry affordance for failed submissions with clear, non-ambiguous errors.
+- Error and empty states on active dispatch list/detail when data fails to load.
+- Lightweight logging/telemetry hook to capture client errors (configurable endpoint, no PII).
+- Error recovery UI patterns (retry button, dismiss, refresh) consistent across views.
+- Copy consistent with language/tone constraints; no fear-inducing language.
+
+## Success Criteria
+-  Users can recover a draft after a reload or transient failure without retyping critical fields.
+-  Failed submissions surface actionable errors and can be retried without losing form state.
+-  List/detail views communicate load failures and allow retry; no silent failures.
+-  Error logging is captured without blocking the UI and without leaking sensitive data.
+-  Drafts persist for at least 7 days; users are prompted to confirm restore on form load.
+-  Autosave does not impact UI responsiveness; saves debounced and run in background.
+-  Retry button clearly distinguishes retries from new submissions (no duplicate entries).
+
+## Follow-On Enablement
+- Sprint 5 can add offline queueing and sync atop draft/restore patterns.
+- Guardrails/audit later can use captured error signals to monitor reliability.
+- UI patterns for retries/errors can be reused in future features.
+- Error logging infrastructure enables debugging and monitoring dashboards.
+
+## Known Gaps or Risks
+- Local draft storage must be scoped per environment/region to avoid collisions.
+- Logging endpoints must not collect sensitive data; ensure redaction and minimal payloads.
+- Draft storage quota (typically 5-10MB per origin) may be exceeded; implement cleanup and warnings.
+- Concurrent autosave requests may overwrite each other; use versioning or timestamps.
+
+---
+
+## Backend Team: Phase-Based Kickoff Tasks
+
+### Phase 1 (Idempotent API Contract)
+- [ ] Confirm all submission endpoints support idempotent operations
+  - Document deduplication strategy (key-based, timestamp-based, or request-ID)
+  - Ensure duplicate submissions return same result as original
+  - Add `idempotency-key` header support (optional; for frontend reference)
+- [ ] Test duplicate submission scenarios; confirm no data duplication
+- [ ] Document any rate-limiting on submission endpoint
+
+### Phase 2 (Error Logging Endpoint)
+- [ ] Implement `POST /logs/client-errors` endpoint
+  - Accept error type, message, stack trace, timestamp, user agent
+  - Scrub PII before storage (redact user IDs, dispatch IDs if needed)
+  - Document required vs. optional fields
+  - Implement rate limiting to prevent spam
+- [ ] Ensure endpoint is robust (handles malformed requests gracefully)
+- [ ] Set up log retention policy (30 days minimum)
+
+### Phase 3 (Error Response Contract)
+- [ ] Standardize error responses across all endpoints
+  - Include error code, message, and recovery hint
+  - Example: `{ "error": "NETWORK_TIMEOUT", "message": "...", "retry": true }`
+  - Document which errors are retryable vs. terminal
+- [ ] Provide error catalog to frontend (types and recovery strategies)
+
+---
+
+## Frontend Team: Phase-Based Kickoff Tasks
+
+### Phase 1 (Draft Persistence)
+- [ ] Create `useDraftStorage` hook for intake form
+  - Save form state to local storage on blur and periodic timer (3-5 second debounce)
+  - Restore draft on form mount and prompt user to confirm
+  - Display draft age (e.g., "Draft from 2 hours ago")
+  - Clear draft after successful submission
+- [ ] Implement draft metadata (timestamp, form version, dispatch ID)
+- [ ] Handle local storage quota errors gracefully (show warning, allow continue)
+
+### Phase 2 (Error Handling & Retry)
+- [ ] Create error boundary component for form submission
+  - Catch and display errors with actionable messages
+  - Categorize errors (network, server, validation) for appropriate messaging
+- [ ] Implement retry button on submission error
+  - Re-post same form data without user re-entry
+  - Show loading state and disable button during retry
+  - Increment retry count (for logging/monitoring)
+- [ ] Preserve form state during error; allow user to edit before retry
+
+### Phase 3 (Error States & Recovery UI)
+- [ ] Add error recovery UI to intake form
+  - "Retry" button with loading state
+  - "Clear draft" button to discard and start fresh
+  - "Dismiss" to acknowledge error and continue editing
+  - Clear, non-intimidating error message
+- [ ] Add error states to list/detail views
+  - "Failed to load dispatches" with retry button
+  - "No active dispatches" (non-error) vs. "Failed to load" (error)
+- [ ] Ensure consistent error message tone across all views
+
+### Phase 4 (Logging & Monitoring)
+- [ ] Create error logging service
+  - Send client errors to `POST /logs/client-errors` endpoint
+  - Scrub PII (remove user IDs, personal data)
+  - Include error type, message, stack trace, timestamp, retry count
+  - Handle logging failures gracefully (don't block UI)
+- [ ] Integrate logging into form submission error handler
+  - Log: submission errors, retry attempts, draft restore events
+- [ ] Test logging endpoint reliability (retry on transient failures)
+
+---
+
+## QA Team: Test Plan per Phase
+
+### Phase 1 (Draft Persistence & Restore)
+**Scenarios:**
+- [ ] Form state auto-saves to local storage every 3-5 seconds (on blur and timer)
+- [ ] Draft persists after page reload; restore prompt appears
+- [ ] User confirms restore; draft state re-populates form
+- [ ] User declines restore; form loads blank
+- [ ] Draft includes timestamp; "Draft from X hours ago" displays
+- [ ] Draft clears after successful submission (no stale recovery)
+- [ ] Draft persists for 7+ days; old drafts can be restored
+- [ ] Local storage quota exceeded: warning displays, user can continue
+
+### Phase 2 (Submission Error & Retry)
+**Scenarios:**
+- [ ] Network error on submit: error message displays with retry button
+- [ ] Server error (500): error message displays with retry button
+- [ ] Validation error (400): error message displays; user can edit form
+- [ ] Retry button resends request; shows loading state
+- [ ] Retry succeeds: success message, draft clears
+- [ ] Retry fails again: error re-appears; user can retry or edit
+- [ ] Form state preserved during error and retry (no loss of data)
+- [ ] Retry does not create duplicate submissions (idempotent)
+
+### Phase 3 (Error Recovery UI)
+**Scenarios:**
+- [ ] Error message is clear and actionable (e.g., "Network unavailable. Retry or check connection.")
+- [ ] "Retry" button is prominent and clickable
+- [ ] "Clear draft" button discards draft and resets form
+- [ ] "Dismiss" button acknowledges error; user can edit form
+- [ ] Error messages use plain language; no technical jargon
+- [ ] Error tone is reassuring, not intimidating
+
+### Phase 4 (Error States on List/Detail)
+**Scenarios:**
+- [ ] List fails to load: "Failed to load dispatches" message + retry button
+- [ ] Detail fails to load: "Could not load dispatch details" + retry button
+- [ ] Retry button re-fetches data and updates view
+- [ ] Empty state ("No active dispatches") differs from error state (different messaging)
+- [ ] Loading state appears during initial load and during retry
+
+### Phase 5 (Logging & Monitoring)
+**Scenarios:**
+- [ ] Submission error logged to `POST /logs/client-errors`
+- [ ] Log includes: error type, message, stack trace, timestamp
+- [ ] Log does not include PII (user IDs, dispatch IDs, personal data redacted)
+- [ ] Logging failure does not block UI or submission retry
+- [ ] Retry attempts logged separately (retry count tracked)
+- [ ] Draft restore events logged for monitoring
+- [ ] Logging endpoint rate limiting: 100+ rapid errors do not overload backend
+
+### Phase 6 (Integration & End-to-End)
+**Scenarios:**
+- [ ] User fills intake form → network failure → error displays → retry succeeds
+- [ ] User fills intake form → refreshes page → draft restore prompt → confirms → continues
+- [ ] User fills intake form → closes browser → reopens app → draft available
+- [ ] User fills intake form → submits → error → refreshes page → draft cleared → form blank
+- [ ] Multiple errors over time all logged correctly; no data loss
+
+### Phase 7 (Language Compliance)
+**Scenarios:**
+- [ ] Error messages use plain language (no technical jargon)
+- [ ] Tone is reassuring and respectful (per `/language/tone-guidelines`)
+- [ ] No forbidden terms in error or recovery messages
+- [ ] Draft age message is clear ("Draft from 2 hours ago", not "stale cache")
+- [ ] Retry messages encourage action without blame
+
+---
+
+## Documentation Quick Links
+
+| Role | Document | Purpose |
+|------|----------|----------|
+| All | [Backend API Contracts](/specs/backend-api-contracts) | All 14 endpoints; logging endpoint, idempotency |
+| All | [Database Schema](/specs/database-schema) | All 5 tables; versioning for retry handling |
+| All | [Blocker Resolution Index](/specs/BLOCKER-RESOLUTION-INDEX) | All 6 Sprint 0 blockers resolved |
+| All | [System Constitution](/constitution/system-constitution) | Design principles (accountability, transparency) |
+| Backend | [Minimal Dispatch Flow](/specs/minimal-dispatch-flow) | Error recovery UX flow |
+| Frontend | [Tone Guidelines](/language/tone-guidelines) | Language standards for error messages |
+| Frontend | [Forbidden Language](/language/forbidden-language) | Terms to avoid in error messages |
+| Frontend | [Sprint 3 Implementation](/roadmap/sprint_3/sprint_3.mdx) | Reusable patterns from prior sprint |
+| QA | [Language Compliance](/language/forbidden-language) | Words/phrases to avoid in error messages |
+
+---
+
+## Decision Tracking
+
+| Decision | Status | Owner | Notes |
+|----------|--------|-------|-------|
+| **Sprint 0 Foundations (All Resolved)** | 🟢 | Architecture | |
+| API Contract | 🟢 | Backend | [Complete Spec](/specs/backend-api-contracts) - Includes logging endpoint, idempotency |
+| Database Schema | 🟢 | DB | [Complete Spec](/specs/database-schema) - Supports versioning for retry/dedup |
+| Auth Architecture | 🟢 | Security | [Complete Spec](/specs/authentication-architecture) - User identity for logging |
+| Offline Support | 🟢 | Product | [Complete Spec](/specs/offline-support-architecture) - Sprint 4 assumes network; full offline in Sprint 5 |
+| Region Scope | 🟢 | Ops | [Complete Spec](/specs/region-scope-architecture) - Error logging scoped by region |
+| Crisis/Management Modes | 🟢 | Product | [Complete Spec](/specs/crisis-management-mode-strategy) - Error recovery in Crisis Mode |
+| **Sprint 4 Specific Decisions** | | | |
+| Autosave Frequency | 🟢|  Frontend | Debounced on blur + 5-second periodic timer |
+| Draft Retention | 🟢|  Frontend | 7 days; user confirmation on restore |
+| Idempotency Strategy | 🟢|  Backend | Request-based deduplication; idempotency-key optional ([API Spec](/specs/backend-api-contracts#idempotency)) |
+| Error Logging | 🟢|  Both | POST /logs/client-errors; PII scrubbed; no user IDs |
+| Retry Strategy | 🟢|  Frontend | Manual button; preserve form state; log attempts |
+| Storage Scope | 🟢|  Frontend | Per dispatch; cleared after submission |
+
+---
+
+## Common Questions
+
+**Q: Will my draft sync across devices?**  
+A: No. Sprint 4 uses local storage only. Sprint 5+ will add server-side sync.
+
+**Q: How long is my draft saved?**  
+A: At least 7 days. After that, you'll need to start a new intake form.
+
+**Q: What if I don't confirm the draft restore prompt?**  
+A: Form loads blank; you can start fresh. The draft remains in storage if you change your mind.
+
+**Q: Can I edit a draft before submitting?**  
+A: Yes. Drafts auto-save as you type. Edit freely; the latest version is always saved.
+
+**Q: What if my browser storage is full?**  
+A: We'll show a warning. You can clear your drafts or free up space. The app won't block you.
+
+**Q: Will my data be logged if there's an error?**  
+A: Only error metadata (type, message, timestamp). Personal information is scrubbed before logging.
+
+**Q: What happens if retry fails multiple times?**  
+A: The form state is preserved. You can edit and try again, or wait and retry later.
+
+---
+
+## Go/No-Go Checklist
+
+**Readiness Assessment:**
+
+- [ ] **Sprint 0 Complete:** All 6 blockers resolved and documented ([Blocker Index](/specs/BLOCKER-RESOLUTION-INDEX))
+- [ ] **Sprint 1 Complete:** Intake form deployed; dispatch records created and persisted
+- [ ] **Sprint 2 Complete:** Active dispatch list/detail views deployed and accessible
+- [ ] **Sprint 3 Complete:** Responder signaling and notifications operational
+- [ ] Idempotent submission endpoint tested and documented ([API Spec](/specs/backend-api-contracts#idempotency))
+- [ ] Error logging endpoint implemented and PII scrubbing verified
+- [ ] Error response contract standardized across all endpoints ([API Spec](/specs/backend-api-contracts#error-response-format))
+- [ ] Local storage schema designed and versioned
+- [ ] Draft persistence hooks implemented and tested
+- [ ] Retry infrastructure (button, loading state, error handling) implemented
+- [ ] Error messages reviewed for tone and language compliance ([Tone Guidelines](/language/tone-guidelines))
+- [ ] Logging service tested; does not block UI on failures
+- [ ] Test data prepared: network errors, server errors, validation errors
+- [ ] Error scenarios documented: which errors are retryable vs. terminal
+
+**Go Decision:** Proceed only if all items above are checked and signed off by Backend, Frontend, and QA leads.
+
+---
+
+## Sprint Timeline
+
+```
+Phase 1: Draft Persistence
+├─ Backend: Confirm idempotent API contract
+├─ Frontend: Implement useDraftStorage hook
+└─ QA: Test draft save, restore, and persistence
+
+Phase 2: Retry Infrastructure
+├─ Backend: Implement error logging endpoint
+├─ Frontend: Add error handling and retry button to forms
+└─ QA: Test submission errors and retry flow
+
+Phase 3: Error States & Recovery UI
+├─ Backend: Standardize error responses
+├─ Frontend: Add error states to list/detail; recovery UI
+└─ QA: Test error states across views
+
+Phase 4: Logging & Sign-Off
+├─ Backend: Test logging endpoint reliability
+├─ Frontend: Integrate logging service; scrub PII
+└─ QA: Test logging, language compliance, e2e scenarios
+
+Phase 5: Final Integration
+├─ All: Run comprehensive error recovery tests
+├─ All: Verify Go/No-Go checklist
+└─ All: Sprint completion review & debrief
+```

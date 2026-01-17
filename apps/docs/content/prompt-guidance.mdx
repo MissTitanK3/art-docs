@@ -1,0 +1,124 @@
+# Prompt Guidance
+
+## Master Prompt: Feature-Based Roadmap Documentation
+
+**Purpose**  
+Generate and maintain a feature-based sprint roadmap. Sprints are not time-bound. Each sprint delivers a foundational capability that enables the next sprint. Documentation must emphasize dependency flow, invariants, and forward momentum.
+
+**Context You Should Assume**
+
+- This project uses feature-based sprints, not time-based sprints.
+- Each sprint exists to unlock or stabilize the next sprint.
+- Documentation lives under:
+
+```
+roadmap/
+├── roadmap-overview.mdx
+└── sprints/
+    ├── sprint_one.mdx
+    ├── sprint_two.mdx (future)
+    └── ...
+```
+
+- Some sprints may later be expanded into sub-documents when:
+  - A tangent emerges
+  - A targeted implementation requires focus
+  - An assumption proves incomplete
+- Those sub-documents live alongside the sprint file and must be explicitly linked.
+
+### Prompt Part 1: Roadmap Overview
+
+Use this prompt to write or update `roadmap-overview.mdx`:
+
+You are documenting a feature-based project roadmap. Write `roadmap-overview.mdx`.
+
+**Requirements**
+
+- Explain what a feature-based sprint is.
+- Explicitly state that sprints are dependency-driven, not time-driven.
+- Describe how each sprint supports and unlocks the next.
+- Define when and why a sprint may gain sub-documents.
+- Clarify how this roadmap keeps the project moving forward even when scope evolves.
+
+**Constraints**
+
+- Be precise. Avoid motivational language.
+- Focus on system continuity, not velocity.
+- Assume the reader is a future contributor or reviewer.
+
+**Include sections**
+
+1. Purpose of the Roadmap
+2. How Feature-Based Sprints Work
+3. Sprint Dependencies and Flow
+4. Handling Scope Expansion and Tangents
+5. How to Use This Roadmap Day-to-Day
+
+### Prompt Part 2: Writing a Sprint
+
+Use this prompt to create or update an individual sprint file, e.g. `sprint_one.mdx`:
+
+You are documenting a single feature-based sprint. Write `sprint_<name>.mdx`.
+
+**Context**
+
+- This sprint exists to enable future sprints.
+- It may depend on assumptions defined in earlier documentation.
+- It must be complete enough that later work does not need to revisit its core decisions.
+
+**Required sections**
+
+1. Sprint Intent
+   - What capability this sprint establishes
+   - Why it must exist before later work
+2. Dependencies
+   - Prior sprints, specs, or invariants this relies on
+   - What breaks if these assumptions are wrong
+3. Scope and Non-Scope
+   - What is explicitly included
+   - What is explicitly excluded
+4. Core Deliverables
+   - Concrete outputs (docs, code paths, guarantees, behaviors)
+   - Written so completion is unambiguous
+5. Success Criteria
+   - Conditions that must be true before moving on
+   - No subjective language
+6. Follow-On Enablement
+   - What future sprints can now assume
+   - What complexity has been removed or stabilized
+7. Known Gaps or Risks
+   - Anything intentionally deferred
+   - Any edge cases acknowledged but not solved
+
+**Constraints**
+
+- No timelines.
+- No estimates.
+- No aspirational language.
+- Write so another engineer could pick this up months later and continue.
+
+### Prompt Part 3: Adding Sprint Sub-Documents
+
+Use this when a sprint needs deeper focus: you are extending an existing sprint with a focused sub-document. Write a new MDX file linked from its parent sprint.
+
+**Rules**
+
+- The sub-document must not redefine sprint intent.
+- It must solve or clarify one specific concern.
+- It must clearly state why it exists separately.
+
+**Include**
+
+1. Problem or Gap Being Addressed
+2. Why This Was Not Originally Scoped
+3. Design or Implementation Details
+4. Impact on the Parent Sprint
+5. Any New Constraints Introduced
+
+End with a clear statement of whether this sub-document changes sprint completion criteria.
+
+### Usage Notes
+
+- Always update the parent sprint to link sub-documents.
+- Never retroactively change completed sprint intent.
+- If a sprint must be revised, document the revision explicitly.

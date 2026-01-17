@@ -1,0 +1,8 @@
+{
+  "BLOCKER-1-COMPLETE": "Blocker 1: API Contracts Complete",
+  "BLOCKER-2-COMPLETE": "Blocker 2: Database Schema Complete",
+  "BLOCKER-3-COMPLETE": "Blocker 3: Authentication Complete",
+  "BLOCKER-4-COMPLETE": "Blocker 4: Offline Support Complete",
+  "BLOCKER-5-COMPLETE": "Blocker 5: Region Scope Complete",
+  "BLOCKER-6-COMPLETE": "Blocker 6: Crisis/Management Modes Complete"
+}

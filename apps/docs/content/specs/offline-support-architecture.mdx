@@ -1,0 +1,910 @@
+# Offline Support Architecture
+
+**Status:** 🟢  
+**Version:** 1.0  
+**Last Updated:** 2026-01-17  
+**Owner:** Frontend/Client Team  
+**Deadline:** Sprint 1 Implementation (post-MVP ready, Sprint 0 foundation only)
+
+---
+
+## Overview
+
+This document specifies the complete offline support architecture required for MVP (Sprints 0-4) and post-MVP (Sprint 5). This architecture:
+
+- Works seamlessly with [Backend API Contracts](/specs/backend-api-contracts)
+- Integrates with [Database Schema](/specs/database-schema)
+- Complements [Authentication Architecture](/specs/authentication-architecture)
+- Enforces [System Constitution](/constitution/system-constitution) invariants (especially Offline Mode)
+- Enables field workers and volunteers to submit reports offline with guaranteed delivery
+
+**Key Principles:**
+- Offline must never feel like abandonment
+- Queued submissions always persist (never silently lost)
+- Sync status is always visible
+- Conflict resolution is simple (last-write-wins with idempotency)
+- User always knows what happened and what to do next
+
+---
+
+## Architecture Decision: MVP Includes Offline Support
+
+### Decision
+
+ **YES - MVP includes offline submission** with these constraints:
+
+1. **Offline submission allowed:** Users can create and submit dispatches while offline
+2. **Queued delivery:** Submissions persist locally and retry when reconnected
+3. **Exponential backoff:** Retries follow progressive timing (30s, 2min, 15min, then every 15min for 24 hours)
+4. **Idempotency:** Client-generated ID prevents duplicates
+5. **Last-write-wins:** Simple conflict resolution (no merge logic needed for MVP)
+6. **Visible queue:** Users see pending submissions with sync status
+7. **Manual retry:** Always available via pull-to-refresh or explicit "Sync Now" button
+
+### Why Include Offline
+
+**Principle:** "Offline behavior must be predictable" ([System Constitution](/constitution/system-constitution))
+
+1. **Field workers need it:** Responders work in areas with spotty coverage (hiking, rural, underground)
+2. **User expectation:** Modern apps handle offline gracefully; not doing so is a regression
+3. **Simple to implement:** Idempotent submission + local storage + exponential backoff (no CRDT needed)
+4. **Constitution requires it:** Invariant #5: "Offline behavior must be predictable"
+5. **Scenario tested:** Tabletop Scenario #3 (Offline Submission in Remote Area) validates design
+
+### Constraints for MVP
+
+| Feature | MVP | Post-MVP |
+|---------|-----|----------|
+| Offline submission |  YES |  Ongoing |
+| Last-write-wins conflict |  YES |  Ongoing |
+| Idempotent deduplication |  YES |  Ongoing |
+| Exponential backoff |  YES |  Ongoing |
+| Local persistence |  YES |  Ongoing |
+| Visible sync status |  YES |  Ongoing |
+| Manual retry |  YES |  Ongoing |
+| Conflict merge logic | ❌ NO |  Sprint 5 post-MVP |
+| Server-side conflict resolution | ❌ NO |  Sprint 5 post-MVP |
+| Operational transform/CRDT | ❌ NO |  Sprint 5+ future |
+
+---
+
+## Offline Flow
+
+### User Creates Dispatch (Offline)
+
+```
+User opens app (offline)
+         ↓
+Offline indicator banner shows:
+"You're offline. Your report will send when you reconnect."
+         ↓
+User fills out dispatch form
+         ↓
+User clicks "Submit"
+         ↓
+App validation (required fields only):
+  - Location present?  or ❌
+  - If invalid: show error, stay on form
+  - If valid: proceed
+         ↓
+App generates unique client_id (UUID or timestamp+random)
+         ↓
+App saves to local storage:
+  {
+    "client_id": "cli_abc123_1234567890",
+    "dispatch": {...},
+    "status": "pending",
+    "created_at": 1642430400,
+    "retry_count": 0,
+    "last_retry_attempt": null,
+    "error": null
+  }
+         ↓
+User sees:
+  "✓ Saved locally. Will send when you reconnect."
+  [↻ Retry Now] button (disabled initially)
+         ↓
+App enters sync retry loop (exponential backoff)
+  First attempt: 30 seconds
+  2nd-10th attempts: Every 2 minutes
+  11th+ attempts: Every 15 minutes
+  Max attempts: 24 hours (then prompt user)
+```
+
+### Sync Retry Loop
+
+```
+Every 30 seconds (if offline):
+         ↓
+Check network status:
+  - Is network available? 
+    YES → Try to sync
+    NO → Wait 30s, retry network check
+         ↓
+Try to POST /dispatches with offline submission:
+         ↓
+Success (200):
+  - Update local queue: status = "synced"
+  - Show: "✓ Your report was sent"
+  - Remove from offline queue after 5 seconds
+  - User sees normal dispatch in live list
+         ↓
+Failure (401/403/400/422):
+  - Update: status = "error", error message
+  - Show error to user: "We couldn't send your report: [error message]"
+  - Stop retrying (user must retry manually)
+  - Show [Retry Now] button
+         ↓
+Failure (500/network timeout):
+  - Increment retry_count
+  - Calculate next_retry = now + exponential_backoff
+  - Update: last_retry_attempt = now, status = "pending"
+  - Show: "Retrying... (attempt 3/288)"
+  - Continue automatic retries
+         ↓
+After 24 hours (attempt 288):
+  - Update: status = "needs_user_action"
+  - Show: "Your report couldn't be sent. [Retry] [Save] [Discard]"
+  - Wait for user action
+```
+
+---
+
+## Client-Side Implementation
+
+### Local Storage Schema
+
+**Table: offline_queue** (IndexedDB for larger payloads)
+
+```json
+{
+  "queue": [
+    {
+      "id": "cli_abc123_1642430400",
+      "client_id": "cli_abc123_1642430400",
+      "dispatch": {
+        "location": {"latitude": 40.7128, "longitude": -74.0060},
+        "location_description": "Park near main entrance",
+        "location_precision": "city_block",
+        "description": "Person needs help",
+        "urgency": "normal"
+      },
+      "status": "pending",
+      "created_at": 1642430400,
+      "submitted_at": null,
+      "synced_at": null,
+      "retry_count": 0,
+      "last_retry_attempt": 1642430430,
+      "next_retry_at": 1642430490,
+      "error": null,
+      "dispatch_id": null
+    }
+  ]
+}
+```
+
+**Fields:**
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `id` | String | Unique offline queue entry ID (for local use only) |
+| `client_id` | String | Unique client-generated ID (sent to server for dedup) |
+| `dispatch` | Object | The dispatch data (location, description, urgency) |
+| `status` | String | "pending", "synced", "error", "needs_user_action" |
+| `created_at` | Unix timestamp | When user created the offline submission |
+| `submitted_at` | Unix timestamp | When first submitted (null if not yet submitted) |
+| `synced_at` | Unix timestamp | When successfully synced (null if pending) |
+| `retry_count` | Number | How many times we've tried to sync |
+| `last_retry_attempt` | Unix timestamp | When we last tried to sync |
+| `next_retry_at` | Unix timestamp | When to retry next (null if synced or error) |
+| `error` | String | Error message if status = "error" |
+| `dispatch_id` | String | Server-assigned ID after sync (null until synced) |
+
+---
+
+### Exponential Backoff Algorithm
+
+```javascript
+function calculateNextRetryTime(retryCount, createdAt, now) {
+  const age = now - createdAt;
+  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+  
+  if (age > maxAge) {
+    return null; // Needs user action, don't retry
+  }
+  
+  let backoffMs;
+  
+  if (retryCount < 1) {
+    // First attempt: 30 seconds
+    backoffMs = 30 * 1000;
+  } else if (retryCount < 10) {
+    // Attempts 2-10: every 2 minutes
+    backoffMs = 2 * 60 * 1000;
+  } else {
+    // Attempts 11+: every 15 minutes
+    backoffMs = 15 * 60 * 1000;
+  }
+  
+  return now + backoffMs;
+}
+
+// Example:
+// Attempt 1 (retry_count=0): +30s
+// Attempt 2 (retry_count=1): +2m
+// Attempt 3 (retry_count=2): +2m
+// ...
+// Attempt 10 (retry_count=9): +2m
+// Attempt 11 (retry_count=10): +15m
+// Attempt 12 (retry_count=11): +15m
+// ...
+// Attempt 288 (retry_count=287, after 24h): stop, needs user action
+```
+
+---
+
+### Network Detection
+
+**Client-side network status:**
+
+```javascript
+// Option 1: navigator.onLine (basic)
+if (!navigator.onLine) {
+  showOfflineIndicator();
+}
+
+// Option 2: Try network request + timeout (better)
+async function checkConnectivity() {
+  try {
+    const response = await fetch('/health', {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(3000) // 3s timeout
+    });
+    return response.ok; // true if 200
+  } catch (error) {
+    return false; // timeout or error
+  }
+}
+
+// Option 3: Listen to online/offline events
+window.addEventListener('online', handleOnline);
+window.addEventListener('offline', handleOffline);
+```
+
+**Recommended approach:** Combine navigator.onLine + periodic /health check
+
+---
+
+### Offline Indicator UI
+
+**Always Visible When Offline:**
+
+```
+┌─────────────────────────────────────┐
+│ ⚠ You're offline                    │
+│ Your reports will send when you     │
+│ reconnect. [↻ Retry Now] [Dismiss]  │
+└─────────────────────────────────────┘
+
+Above dispatch list/form
+```
+
+**States:**
+
+| State | Banner | Actions |
+|-------|--------|---------|
+| Online | ✓ (hidden) | All buttons enabled |
+| Offline | ⚠ Yellow banner | Submit button enabled, Retry grayed out |
+| Submitting offline | ⚠ Yellow banner | Spinner, "Saving..." |
+| Saved offline | ⚠ Yellow banner | "✓ Saved locally. [↻ Retry]" |
+| Syncing | ⚠ Banner | "Syncing... (attempt 2/288)" |
+| Sync error | ❌ Red banner | "Error: [message] [↻ Retry]" |
+| Needs user action (24h) | ❌ Red banner | "Couldn't send [↻ Retry] [Save] [Discard]" |
+
+---
+
+## Server-Side Implementation
+
+### Idempotency Key
+
+**Every offline submission includes `client_id`:**
+
+```bash
+POST /dispatches
+Content-Type: application/json
+
+{
+  "client_id": "cli_abc123_1642430400",
+  "location": {...},
+  "description": "Person needs help",
+  "urgency": "normal"
+}
+```
+
+**Server Logic:**
+
+```
+On request:
+  1. Check if client_id exists in submissions_received table
+     - If YES: return 201 with existing dispatch_id
+              (idempotent - same client_id returns same result)
+     - If NO: proceed to create new dispatch
+  
+  2. Create dispatch record:
+     - dispatch_id = generate new ID
+     - submitter_id = user from token
+     - location = from request
+     - client_id = from request (store for dedup)
+     - status = "open"
+     - version = 1
+  
+  3. Insert into submissions_received:
+     - client_id = from request
+     - dispatch_id = newly created
+     - received_at = now
+     - submitter_id = user from token
+  
+  4. Return 201 Created with dispatch_id
+```
+
+**Deduplication Table:**
+
+```sql
+CREATE TABLE submissions_received (
+  client_id VARCHAR(64) PRIMARY KEY,
+  dispatch_id VARCHAR(32) NOT NULL,
+  received_at TIMESTAMP NOT NULL,
+  submitter_id VARCHAR(32) NOT NULL,
+  FOREIGN KEY (dispatch_id) REFERENCES dispatches(id),
+  FOREIGN KEY (submitter_id) REFERENCES users(id)
+);
+
+CREATE INDEX idx_submissions_dispatch ON submissions_received(dispatch_id);
+```
+
+---
+
+### Offline Submission Endpoint (Variant of POST /dispatches)
+
+**Endpoint:** `POST /dispatches`
+
+**With offline submission payload:**
+
+```json
+{
+  "client_id": "cli_abc123_1642430400",
+  "location": {
+    "latitude": 40.7128,
+    "longitude": -74.0060,
+    "precision": "city_block",
+    "description": "Park near main entrance"
+  },
+  "description": "Person needs help",
+  "urgency": "normal"
+}
+```
+
+**Response (201 Created):**
+
+```json
+{
+  "dispatch_id": "dsp_xyz789",
+  "status": "open",
+  "client_id": "cli_abc123_1642430400",
+  "created_at": "2026-01-17T14:30:00Z",
+  "message": "Report received and queued"
+}
+```
+
+**Response (500 Server Error - Offline Client Must Retry):**
+
+```json
+{
+  "error": {
+    "code": "SERVER_ERROR",
+    "message": "Temporarily unavailable. Please try again.",
+    "request_id": "req_abc123",
+    "retriable": true
+  }
+}
+
+HTTP 500
+```
+
+**Response (400 Bad Request - Don't Retry):**
+
+```json
+{
+  "error": {
+    "code": "INVALID_LOCATION",
+    "message": "Location is required",
+    "request_id": "req_abc123",
+    "retriable": false
+  }
+}
+
+HTTP 400
+```
+
+---
+
+## Conflict Resolution: Last-Write-Wins
+
+### Why Last-Write-Wins for MVP
+
+1. **Simple:** No merge logic needed
+2. **Predictable:** Last submission always wins (idempotent)
+3. **Sufficient for MVP:** Most offline work is single-author edits
+4. **User expectations:** "My latest action is what matters"
+
+### How It Works
+
+**Scenario: User submits offline, but another responder updates the same dispatch online**
+
+```
+Timeline:
+
+12:00 PM - Online dispatch created (version=1)
+
+12:05 PM - User goes offline
+         - Fetches dispatch (version=1)
+         - Adds responder status change
+
+12:10 PM - Other responder responds (version=2)
+         - Dispatch updated on server
+
+12:15 PM - User regains connectivity
+         - Tries to submit version 1 change
+         - Server receives version=1, current version=2
+         - Conflict detected
+         
+Decision (last-write-wins):
+  - Use client timestamp + user ID to determine order
+  - Most recent action wins
+  - Both actions logged (no silent loss)
+```
+
+**Implementation:**
+
+```sql
+-- Dispatch table has version + timestamp
+UPDATE dispatches 
+  SET version = version + 1,
+      status = ?,
+      updated_at = NOW(),
+      updated_by = ?
+  WHERE dispatch_id = ? 
+  AND version = ? -- optimistic locking
+  AND updated_at <= NOW() + 5 seconds; -- small buffer for clock skew
+
+-- If no rows updated: version mismatch, conflict!
+-- Return 409 Conflict to client with latest version
+```
+
+**Client Behavior on Conflict (409):**
+
+```javascript
+if (response.status === 409) {
+  // Server has newer version
+  // Options:
+  // 1. Fetch latest and retry
+  // 2. Show user: "This dispatch was updated online. [Fetch Latest]"
+  // 3. Don't auto-resolve (respect user agency)
+  
+  // MVP: Show message to user, let them decide
+  showConflictUI({
+    message: "This report was updated while you were offline",
+    action: "Fetch Latest"
+  });
+}
+```
+
+---
+
+## Error Handling
+
+### Retriable Errors (Auto-Retry)
+
+These errors should trigger automatic exponential backoff:
+
+| Status | Error | Retriable | Action |
+|--------|-------|-----------|--------|
+| 500 | Server Error |  YES | Auto-retry with backoff |
+| 502 | Bad Gateway |  YES | Auto-retry with backoff |
+| 503 | Service Unavailable |  YES | Auto-retry with backoff |
+| 504 | Gateway Timeout |  YES | Auto-retry with backoff |
+| timeout | Network Timeout |  YES | Auto-retry with backoff |
+
+### Non-Retriable Errors (Stop Retrying)
+
+These errors should NOT be retried; user action required:
+
+| Status | Error | Retriable | Action |
+|--------|-------|-----------|--------|
+| 400 | Bad Request (invalid data) | ❌ NO | Show error, require manual retry |
+| 401 | Unauthorized (invalid token) | ❌ NO | Redirect to login |
+| 403 | Forbidden (no permission) | ❌ NO | Show error, require manual retry |
+| 409 | Conflict (version mismatch) | ⚠️ SPECIAL | Show conflict UI |
+| 422 | Unprocessable Entity | ❌ NO | Show validation error |
+
+---
+
+## Offline Queue UI
+
+### Pending Submissions List
+
+**When user has pending offline submissions:**
+
+```
+┌─────────────────────────────────────────┐
+│ 📬 Pending (2)                 [Retry]  │
+├─────────────────────────────────────────┤
+│ ┌─────────────────────────────────────┐ │
+│ │ Person needs help                   │ │
+│ │ Park near main entrance             │ │
+│ │ Normal urgency                      │ │
+│ │ ↻ Syncing... (attempt 2/288)       │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ ┌─────────────────────────────────────┐ │
+│ │ Suspicious activity near shops      │ │
+│ │ Downtown area                       │ │
+│ │ Critical urgency                    │ │
+│ │ ✓ Saved locally [↻ Retry]          │ │
+│ └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+```
+
+**Features:**
+
+- [ ] Count of pending submissions (badge)
+- [ ] Tap to expand each pending submission
+- [ ] Show current status (syncing, error, saved)
+- [ ] Show retry count for auto-retry submissions
+- [ ] Manual [Retry] button per submission
+- [ ] [Discard] or [Save] options after 24 hours
+- [ ] Pull-to-refresh or global [Sync Now] button
+
+---
+
+### Error States
+
+**Single Submission Error:**
+
+```
+┌─────────────────────────────────────────┐
+│ ❌ Report couldn't be sent              │
+│                                         │
+│ Person needs help                       │
+│ Park near main entrance                 │
+│ Normal urgency                          │
+│                                         │
+│ Error: Invalid location coordinates     │
+│ This error won't resolve automatically. │
+│                                         │
+│ [↻ Retry]  [Save]  [Discard]           │
+└─────────────────────────────────────────┘
+```
+
+**After 24 Hours (Needs Action):**
+
+```
+┌─────────────────────────────────────────┐
+│ ⚠ Been waiting 24 hours                 │
+│                                         │
+│ Suspicious activity near shops          │
+│ Downtown area                           │
+│ Critical urgency                        │
+│                                         │
+│ We've tried sending this 288 times.     │
+│ What would you like to do?              │
+│                                         │
+│ [↻ Keep Trying]  [Save to Device]       │
+│              [Delete]                   │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Testing Checklist
+
+### Before MVP Release
+
+**Offline Functionality:**
+
+- [ ] Can create dispatch while offline (no network)
+- [ ] Dispatch saved to local storage
+- [ ] Offline indicator banner appears
+- [ ] Sync retries automatically with exponential backoff
+- [ ] Manual retry [Retry] button works
+- [ ] Dispatch syncs when back online
+- [ ] Sync success message appears
+- [ ] Synced dispatch appears in live list
+
+**Data Persistence:**
+
+- [ ] Close app while offline, reopen, queue still there
+- [ ] Multiple offline submissions queued together
+- [ ] Each submission retries independently
+
+**Idempotency:**
+
+- [ ] Submit same offline dispatch twice, only one created on server
+- [ ] Retry offline dispatch, doesn't create duplicate
+- [ ] client_id is unique per submission
+
+**Error Handling:**
+
+- [ ] 500 error triggers auto-retry
+- [ ] 400 error stops retrying, shows error
+- [ ] Timeout triggers auto-retry
+- [ ] Network disconnect shows offline banner
+- [ ] Network reconnect triggers immediate sync attempt
+
+**Conflict Resolution:**
+
+- [ ] Offline submission + concurrent online edit handled gracefully
+- [ ] 409 Conflict response shows clear message
+- [ ] User can manually fetch and retry
+
+**UI/UX:**
+
+- [ ] Offline banner always visible when offline
+- [ ] Pending submissions badge shows count
+- [ ] Retry count increases on each attempt
+- [ ] After 24 hours, user prompted for action
+- [ ] No ambiguous states ("Pending..." is vague)
+
+### Stress Testing
+
+- [ ] Rapid online/offline toggles handled
+- [ ] 50+ pending submissions don't crash client
+- [ ] Very long retry attempts (>288) handled
+- [ ] App restart during sync in progress
+
+---
+
+## Implementation Phases
+
+### Phase 1: Sprint 0 (Foundation Only)
+
+**Backend:**
+- [ ] Add `client_id` to dispatch submission schema
+- [ ] Create `submissions_received` deduplication table
+- [ ] Implement idempotency check in POST /dispatches
+- [ ] Handle/return 5xx errors for retry signals
+- [ ] Log all submission attempts (audit trail)
+
+**Frontend:**
+- [ ] Add `client_id` to offline submission payload
+- [ ] Implement local storage schema for offline queue
+- [ ] Add offline indicator banner
+- [ ] Add manual "Retry" button
+- [ ] Test offline form submission (manual, not auto-sync yet)
+
+**Status:**  Ready for Sprint 0 kickoff
+
+### Phase 2: Sprint 1 (Full Offline Support)
+
+**Frontend:**
+- [ ] Implement exponential backoff retry loop
+- [ ] Add network detection (navigator.onLine + /health)
+- [ ] Implement pending submissions UI
+- [ ] Add sync status indicators
+- [ ] Add [Sync Now] / pull-to-refresh
+- [ ] Auto-trigger sync on reconnect
+- [ ] Implement 24-hour prompt UI
+
+**Backend:**
+- [ ] Add version field to dispatches (conflict detection)
+- [ ] Implement optimistic locking (version check)
+- [ ] Return 409 Conflict on version mismatch
+- [ ] Add retry tracking to audit log
+
+**QA:**
+- [ ] Full test plan for offline scenarios
+- [ ] Stress test with 50+ pending submissions
+- [ ] Test rapid online/offline toggles
+- [ ] Verify no data loss on app restart
+
+**Status:** ⏳ Ready for Sprint 1
+
+### Phase 3: Sprint 5+ (Advanced Conflict Resolution)
+
+**Post-MVP enhancements (not needed for MVP):**
+- [ ] Operational Transform (OT) for multi-author edits
+- [ ] CRDT-based merge for complex conflicts
+- [ ] Server-side conflict resolution strategies
+- [ ] Conflict UI showing both versions
+
+---
+
+## Alignment with B1, B2, B3
+
+### Complements B1 (Backend API Contracts)
+
+ **No new endpoints needed:**
+- Uses existing POST /dispatches endpoint
+- Uses existing authentication (JWT token on retry)
+- Uses existing region scoping
+
+ **Enhances POST /dispatches:**
+- B1 defines: Dispatch creation request/response
+- B4 specifies: Offline variant with client_id + idempotency
+- **Result:** POST /dispatches now supports offline submissions
+
+---
+
+### Integrates with B2 (Database Schema)
+
+ **New deduplication table:**
+- B2 defines: dispatches, users, responders, audit_log, notification_queue
+- B4 specifies: submissions_received table for idempotency
+- **Result:** Database supports duplicate prevention
+
+ **Version field for conflicts:**
+- B2 defines: version field on dispatches (for optimistic locking)
+- B4 specifies: Use version for conflict detection
+- **Result:** Database schema already prepared
+
+ **Audit trail:**
+- B2 defines: audit_log table with before/after snapshots
+- B4 specifies: Log all offline submission attempts
+- **Result:** Complete audit trail for offline submissions
+
+---
+
+### Coordinates with B3 (Authentication)
+
+ **JWT tokens work offline:**
+- B3 defines: 1-hour JWT expiry
+- B4 specifies: Token remains valid during offline submission
+- **Result:** No auth issues for offline submissions
+
+ **No new roles needed:**
+- B3 defines: responder/admin/viewer roles
+- B4 specifies: Same roles apply to offline submissions
+- **Result:** Permission model unchanged
+
+---
+
+## Constitution Compliance
+
+**Offline Invariants (from Constitution):**
+
+1.  **Queued submissions persist across app restart**
+   - Implementation: IndexedDB local storage survives app close
+   - Verified in Phase 2 testing
+
+2.  **Offline status is visible before the user starts typing**
+   - Implementation: Banner shown on app open
+   - Verified in Phase 2 testing
+
+3.  **Sync failure never silently discards data**
+   - Implementation: Stored locally with error message, manual retry required
+   - Verified in Phase 2 testing
+
+4.  **Retry is always manual or clearly automatic**
+   - Implementation: Auto-retry with explicit attempt counter ("attempt 2/288")
+   - Verified in Phase 2 testing
+
+**Design Principle:**
+> "Offline behavior must be predictable." - System Constitution
+
+ This architecture makes offline behavior fully predictable and transparent.
+
+---
+
+## Security Considerations
+
+### Local Storage Security
+
+**What's stored locally:**
+- Dispatch data (non-sensitive: location, description, urgency)
+- Metadata (client_id, timestamps, retry count)
+
+**What's NOT stored locally:**
+- Passwords, tokens, authentication credentials
+- PII beyond what user is submitting
+- Sensitive system data
+
+**Protection:**
+- Use IndexedDB (not localStorage) for better security
+- Encrypt if platform supports (e.g., Encrypted Storage API)
+- Clear queue on logout (user action)
+- No unencrypted data on backups (user setting)
+
+### Idempotency Key Security
+
+**client_id generation:**
+```javascript
+function generateClientId() {
+  // UUID v4 + timestamp + random bytes
+  // Must be unique per submission attempt
+  return `cli_${uuidv4()}_${Date.now()}_${randomBytes(8).toString('hex')}`;
+}
+```
+
+**Storage:**
+- Transmitted in request body (not sensitive)
+- Never used as session token or credential
+- Simple dedup mechanism, not security-critical
+
+---
+
+## Post-MVP Enhancements
+
+These can be added after MVP without breaking offline support:
+
+- **Conflict resolution UI:** Show user both versions when conflicts occur
+- **Merge strategies:** Server-side merge for multi-author edits
+- **Partial sync:** Sync critical updates first, queue non-critical
+- **Push notifications:** Notify user when pending submission syncs
+- **Batch submissions:** Group multiple pending submissions into single request
+- **Selective sync:** User can delete individual pending submissions
+- **Bandwidth awareness:** Pause syncing on low-bandwidth networks
+
+---
+
+## Related Documents
+
+- [Backend API Contracts](/specs/backend-api-contracts) - POST /dispatches endpoint
+- [Database Schema](/specs/database-schema) - version field and audit log
+- [Authentication Architecture](/specs/authentication-architecture) - JWT tokens
+- [System Constitution](/constitution/system-constitution) - Offline design principle
+- [Offline Guarantees](/specs/offline-guarantees) - Constitutional guarantees
+- [Modes Document](/constitution/modes) - Offline Mode
+- [Tabletop Scenario 3](/compliance/tabletop-scenarios#scenario-3-offline-submission-in-remote-area) - Offline scenario testing
+
+---
+
+## Deployment Checklist
+
+- [ ] submissions_received table created
+- [ ] Idempotency logic implemented in POST /dispatches
+- [ ] 5xx error responses configured
+- [ ] Audit log captures all offline submissions
+- [ ] Client app has offline queue storage
+- [ ] Offline banner implemented
+- [ ] Manual retry button works
+- [ ] Network detection implemented
+- [ ] Exponential backoff tested
+- [ ] 24-hour prompt configured
+- [ ] All offline test cases passing
+
+---
+
+## Owners & Contacts
+
+| Role | Team | Contact |
+|------|------|---------|
+| Offline Implementation | Frontend Lead | (TBD) |
+| Backend Sync Logic | Backend Lead | (TBD) |
+| Database Idempotency | Database Lead | (TBD) |
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-01-17 | MVP offline support (submission + retry + last-write-wins) |
+
+---
+
+**Document Status:** 🟢 **READY FOR IMPLEMENTATION**  
+**MVP Phase:** Sprint 0 (foundation) + Sprint 1 (full implementation)  
+**Blocks:** Improved UX for field workers in Sprint 1+  
+**Depends On:** [Backend API Contracts](/specs/backend-api-contracts) , [Database Schema](/specs/database-schema) , [Authentication Architecture](/specs/authentication-architecture) 
+
+---
+
+## Next Steps
+
+1. **Backend Team:** Implement idempotency table + dedup logic (Sprint 0 stabilization)
+2. **Frontend Team:** Implement offline queue storage + indicator (Sprint 0 stabilization)
+3. **Frontend Team:** Implement full retry loop + UI (Sprint 1 kickoff)
+4. **Database Team:** Add version field + conflict detection (Sprint 1 kickoff)
+5. **QA Team:** Execute offline test plan (Sprint 1 stabilization)
+
+**Sprint 0 kickoff Go/No-Go:** Foundation ready. Full implementation in Sprint 1.

@@ -1,0 +1,316 @@
+# Sprint 6: Language & UX Guardrails
+
+## Executive Summary
+
+**Status:** Kickoff (after Sprint 0-5 completion)  
+**Sprint 0 Blockers:** 🟢 All 6 resolved (B1-B6: API, Schema, Auth, Offline, Regions, Modes)  
+**Sprint 1-5 Blockers:** 🟢 All complete and operational  
+**Sprint 6 Blockers:** None (pattern library audit can start immediately)  
+
+**Action Items:**
+- [ ] Schedule language audit kickoff with frontend team
+- [ ] Assign pattern library owner & governance model
+- [ ] Identify all existing UI patterns from Sprints 1–5
+
+---
+
+## Sprint Intent
+- **Comprehensive audit** of all UI copy beyond core flows (Sprints 1-3 already applied language checks to intake, active view, and notifications).
+- Establish a **reusable pattern library** and verification checklist so future features inherit approved language without re-auditing.
+- Identify and fix any remaining harmful defaults, edge-case copy, or institutional language drift.
+
+## Objective & Success Definition
+**Objective:** Create a systematized, maintainable approach to language and UX compliance that prevents cognitive load drift and enables scalable feature development.
+
+**Success is achieved when:**
+- Pattern library is used by 100% of new feature work without re-auditing
+- PR review checklist catches language violations before merge
+- No new forbidden terms or institutional language appear in future sprints
+
+## Framing the Unknowns
+- **Pattern Library Scope:** Which UI patterns should be included (buttons, errors, loading states, empty states, success messages)?
+- **Localization:** Will the system support multiple languages? Should pattern library be language-agnostic or English-only?
+- **Backend Strings:** Can backend APIs be configured to return approved copy, or must the client sanitize/override them?
+- **Living Document:** Who maintains the pattern library long-term, and how are new patterns proposed?
+
+## Primary Risks & Tradeoffs
+**Risks:**
+- Pattern library becomes outdated if not actively maintained (mitigated by assigning owner and reviewing quarterly)
+- Complex patterns might not fit all use cases, tempting teams to deviate (mitigated by "escape hatch" docs explaining when/how to deviate)
+- Localization later could require pattern library rework (mitigated by planning ahead)
+
+**Tradeoffs:**
+- **Strictness vs. Flexibility:** Rigid patterns ensure consistency but may block valid use cases; flexible patterns allow adaptation but lose guardrails
+- **Pattern Library Size:** Comprehensive library is thorough but overwhelming; minimal library is digestible but may miss cases
+
+## Phased Implementation Plan
+**Phase 1 (Comprehensive Audit):**
+- Review all copy from Sprints 1-5 against forbidden language and tone guidelines
+- Categorize current language patterns by type (buttons, errors, success, loading, empty states, reassurance)
+- Document what works well and what needs improvement
+
+**Phase 2 (Pattern Library Creation):**
+- Build pattern library document with approved phrases for each category
+- Include rationale (why this phrasing, what makes it effective)
+- Add "do/don't" examples
+
+**Phase 3 (Verification Checklist):**
+- Create PR checklist for new feature work
+- Make checklist reference the pattern library
+- Test checklist against existing flows to ensure it catches violations
+
+**Phase 4 (Governance & Handoff):**
+- Document who owns pattern library and how changes are proposed
+- Set up quarterly review cycle
+- Train team on using checklist
+
+## Technology Stack
+- **Documentation:** Markdown files in `/language/` (e.g., `ui-patterns.md`, `verification-checklist.md`)
+- **Tooling (Optional):** Linter with custom rules to detect forbidden terms in code (ESLint plugin or custom)
+- **Template Engine (Optional):** i18n library if planning localization (next-i18n-static, react-intl)
+- **Storage:** Git (versioning and history of pattern changes)
+- **Review Process:** GitHub PR templates referencing checklist
+
+## Dependencies
+- **Sprint 0 Complete:** All 6 blockers resolved ([API](/specs/backend-api-contracts), [Schema](/specs/database-schema), [Auth](/specs/authentication-architecture), [Offline](/specs/offline-support-architecture), [Regions](/specs/region-scope-architecture), [Modes](/specs/crisis-management-mode-strategy))
+- **Sprint 1-5 Complete:** Core features deployed; all user-facing flows operational
+- **Language Foundation:** Constitution language/tone guidance available via [System Constitution](/constitution/system-constitution), [Forbidden Language](/language/forbidden-language), [Approved Copy](/language/approved-copy)
+- **Initial Audit:** Sprints 1-3 already received language checks; Sprint 6 extends to Sprints 4-5 edge cases
+- **Config Alignment:** Sprint 0 config ensures messages consistent across deployments ([Runtime Config](/turbo/apps/web/config/runtime.ts))
+
+## Scope and Non-Scope
+- Scope:
+  - **Comprehensive audit** of all copy beyond core flows: error/offline states (Sprint 4-5), edge cases, admin/settings flows.
+  - Create a **pattern library document** capturing approved phrases, button labels, error templates, and reassurance language.
+  - Establish a **verification checklist** for future feature work to self-check language compliance.
+  - Review and refine any optional filters or settings introduced in later sprints.
+  - Ensure backend-provided strings are mapped/sanitized if needed.
+- Non-Scope:
+  - Re-auditing Sprint 1-3 core flows (already language-checked).
+  - New navigation structures or visual redesigns.
+  - Adding complex configuration of language per user role.
+
+## Core Deliverables
+- **Pattern library document** (`/language/ui-patterns.md` or similar) with:
+  - Approved button labels, helper text templates, error message patterns
+  - Reassurance language examples ("You can change this later", "Approximate is fine")
+  - Status/state labels ("Queued", "Syncing", "Active", etc.) with tone rationale
+- **Verification checklist** for new features to self-check against forbidden terms and tone guidelines.
+- Audit results for Sprint 4-5 flows (error recovery, offline states) with any copy updates applied.
+- Refined settings/filters if present; harmful defaults removed.
+- Backend string mapping/sanitization guide if needed.
+
+## Success Criteria
+- **Pattern library is complete** and usable by future feature work; includes examples for common UI scenarios.
+- **Verification checklist is tested** against existing flows and catches language guideline violations.
+- No forbidden terms or institutional language remain in **any** user-facing flow (core and edge cases).
+- Sprint 4-5 error/offline copy is clear, reassuring, and non-ambiguous.
+- Backend-provided strings have mapping/sanitization rules if needed.
+
+---
+
+## Backend Team - Concrete Kickoff Tasks
+
+| Phase | Task | Deliverable | Validation |
+|-------|------|-------------|-----------|
+| 1 | Audit any backend-provided strings in API responses (errors, status labels) | List of all user-facing strings from API | Reviewed against forbidden language list |
+| 2 | Identify strings that require client-side sanitization or override | Mapping doc (API string → approved client copy) | Coordinated with frontend team |
+| 2 | (Optional) Add i18n support to backend if localization planned | i18n initialization in backend services | Works with frontend i18n setup |
+| 3 | Review backend error messages against pattern library | Updated error responses using approved templates | Tested in integration with frontend |
+
+---
+
+## Frontend Team - Concrete Kickoff Tasks
+
+| Phase | Task | Deliverable | Validation |
+|-------|------|-------------|-----------|
+| 1 | Conduct comprehensive audit of all UI copy (Sprints 1–5) | Audit spreadsheet with copy by component + current assessment | Shared with language review group |
+| 1 | Categorize patterns (buttons, errors, loading, success, empty states, reassurance) | Pattern categorization doc | Used as input for library structure |
+| 2 | Build pattern library Markdown document with do/don't examples | `/language/ui-patterns.md` with ≥50 patterns | Usable as reference for all future work |
+| 2 | Create component library or constants file referencing patterns | Patterns hardcoded or imported in components | Used in Phase 3 verification |
+| 3 | Create PR checklist for language compliance | GitHub PR template with language verification items | Linked in repo docs |
+| 3 | Build (optional) ESLint rule to detect forbidden terms in code | ESLint config with custom rules | Pre-commit check if tooling allows |
+| 4 | Train team on pattern library & checklist usage | Wiki/training doc + team sync | All frontend devs can use it independently |
+
+---
+
+## QA Team - Test Plan with Scenarios per Phase
+
+### Phase 1: Comprehensive Audit
+
+**Scenario 1.1: Pattern Inventory Completeness**
+- Action: Walk through all existing UI in Sprints 1–5; list every unique string/pattern
+- Expected: Audit spreadsheet with 100+ entries (buttons, errors, states, reassurance, labels)
+- Validation: Audit reviewed by product & language stakeholder
+
+**Scenario 1.2: Forbidden Language Scan**
+- Action: Search all UI text for forbidden terms (from `language/forbidden-language.md`)
+- Expected: Any violations flagged and categorized by severity
+- Automation: Text search + manual review checklist
+
+**Scenario 1.3: Tone Consistency Assessment**
+- Action: Sample 20 random copy instances; assess tone against guidelines
+- Expected: Tone is consistent, appropriate, and non-institutional
+- Validation: Language stakeholder spot-check
+
+### Phase 2: Pattern Library Creation
+
+**Scenario 2.1: Pattern Coverage by Type**
+- Action: Review pattern library against audit; ensure every pattern type is covered
+- Expected: Library has ≥5 examples per category (buttons, errors, loading, success, empty, reassurance)
+- Validation: Library reviewed & approved before Phase 3
+
+**Scenario 2.2: Do/Don't Examples Clarity**
+- Action: Review all do/don't examples for clarity and accuracy
+- Expected: Each example explains the reasoning; rule is clear and actionable
+- Validation: Spot test with new team member; can they follow the examples?
+
+**Scenario 2.3: Backend String Mapping Accuracy**
+- Action: Test backend API responses; verify mapped copy matches pattern library
+- Expected: Client overrides backend strings correctly; no mismatches
+- Automation: API integration test + snapshot test of rendered text
+
+### Phase 3: Verification Checklist
+
+**Scenario 3.1: Checklist Catches Violations**
+- Action: Intentionally inject forbidden term into a new component; run checklist (manual or automated)
+- Expected: Checklist flags the violation before merge
+- Automation: Pre-commit hook or PR check
+
+**Scenario 3.2: Checklist Doesn't Over-Flag**
+- Action: Use pattern library approved copy in a new component; run checklist
+- Expected: No false positives; checklist passes cleanly
+- Validation: Manual spot-check of PRs using the checklist
+
+**Scenario 3.3: Checklist Completeness**
+- Action: Apply checklist to 3 new feature PRs; assess coverage
+- Expected: Checklist catches ≥95% of language issues before review
+- Validation: Tracked in sprint metrics
+
+### Phase 4: Governance & Handoff
+
+**Scenario 4.1: Pattern Library Owner Accountability**
+- Action: Document pattern library owner role, update process, quarterly review cycle
+- Expected: Clear process for proposing & approving new patterns; no backlog of change requests
+- Validation: Owner publicly assigned; process documented in wiki
+
+**Scenario 4.2: Team Competency**
+- Action: Survey frontend team on pattern library & checklist usage 1 week after training
+- Expected: ≥80% of team confident using pattern library independently
+- Validation: Competency survey results
+
+---
+
+## Documentation Quick Links
+
+| Role | Document | Purpose |
+|------|----------|----------|
+| All | [Backend API Contracts](/specs/backend-api-contracts) | All 14 endpoints; error message contracts |
+| All | [System Constitution](/constitution/system-constitution) | Design principles & language values |
+| All | [Blocker Resolution Index](/specs/BLOCKER-RESOLUTION-INDEX) | All 6 Sprint 0 blockers resolved |
+| All | [Forbidden Language](/language/forbidden-language) | Terms to avoid and why |
+| All | [Approved Copy](/language/approved-copy) | Recommended language patterns |
+| All | [Tone Guidelines](/language/tone-guidelines) | Principles for approved copy |
+| Frontend | [UI Pattern Library](./ui-patterns.md) | Approved patterns with do/don't & rationale |
+| Frontend | [Verification Checklist](./language-verification-checklist.md) | Self-check before submitting PR |
+| Frontend | [Language Audit Results](./sprint-6-language-audit.md) | Findings from Sprints 1–5 audit |
+| Frontend | [Backend String Mapping](./backend-string-mapping.md) | API strings → approved client copy |
+| QA | [Language Test Plan](./sprint-6-test-plan.md) | Audit, library, and checklist test scenarios |
+
+---
+
+## Decision Tracking
+
+| Decision | Owner | Status | Notes | Last Updated |
+|----------|-------|--------|-------|---------------|
+| **Sprint 0 Foundations (All Resolved)** | Architecture | 🟢 | |
+| API Contract | Backend | 🟢 | [Complete Spec](/specs/backend-api-contracts) - All endpoints; error messages standardized |
+| Database Schema | DB | 🟢 | [Complete Spec](/specs/database-schema) - Supports all features |
+| Auth Architecture | Security | 🟢 | [Complete Spec](/specs/authentication-architecture) - User roles established |
+| Offline Support | Product | 🟢 | [Complete Spec](/specs/offline-support-architecture) - Offline messaging in Sprint 5 |
+| Region Scope | Ops | 🟢 | [Complete Spec](/specs/region-scope-architecture) - 3 initial regions |
+| Crisis/Management Modes | Product | 🟢 | [Complete Spec](/specs/crisis-management-mode-strategy) - Mode separation locked |
+| **Sprint 6 Specific Decisions** | | | |
+| Pattern Library Scope (which patterns to include) | Product & Language Lead | ⏳ | Completeness vs. maintainability; decision after audit |
+| Backend String Override Strategy | Frontend Lead | ⏳ | Client control vs. API contract; after backend audit |
+| Localization Support (in pattern library) | Product | ⏳ | Future-proofing for i18n; roadmap alignment needed |
+| Pattern Library Owner (role & responsibilities) | Engineering Manager | ⏳ | Long-term maintenance accountability |
+| Checklist Automation (ESLint vs. manual) | Frontend Lead | ⏳ | Developer experience & enforcement trade-off |
+
+---
+
+## Common Questions
+
+**Q: Do we need to re-audit Sprints 1–3 copy?**  
+A: No. Those flows already received language review and are considered baseline approved. Phase 1 focuses on Sprints 4–5 and any edge cases not yet covered.
+
+**Q: Who decides if new copy is approved?**  
+A: Approved patterns are in the library. For novel scenarios not in the library, the pattern library owner (appointed in Phase 4) reviews and either approves or adds to the library.
+
+**Q: Can we deviate from the pattern library?**  
+A: Rarely, and only with documented rationale. The library includes an "escape hatch" section explaining when deviations are acceptable and how to propose them.
+
+**Q: How often does the pattern library get updated?**  
+A: Quarterly review minimum. Ad-hoc additions when new patterns are needed. Owner manages the backlog.
+
+**Q: Will this pattern library support multiple languages?**  
+A: The library documents approved English patterns. If localization is planned, translation would happen later, but the structure supports it (e.g., using i18n keys).
+
+**Q: What if backend APIs return unapproved strings?**  
+A: Client sanitizes or overrides using the mapping document. Integration tests verify the override works correctly.
+
+---
+
+## Go/No-Go Checklist
+
+- [ ] **Sprint 0 Complete:** All 6 blockers resolved and documented ([Blocker Index](/specs/BLOCKER-RESOLUTION-INDEX))
+- [ ] **Sprint 1-5 Complete:** All core features deployed and operational
+- [ ] **Audit Complete:** All copy from Sprints 1–5 inventoried and reviewed
+- [ ] **Forbidden Language Scan:** No critical violations found; minor issues logged for Phase 2 fixes
+- [ ] **Pattern Library Drafted:** Structure and ≥50 patterns documented with examples ([Tone Guidelines](/language/tone-guidelines), [Approved Copy](/language/approved-copy))
+- [ ] **Backend Audit:** API string responses reviewed; mapping identified if overrides needed
+- [ ] **Verification Checklist Created:** PR template with language checks ready to test
+- [ ] **Tooling Decided:** ESLint rule, automation, or manual checklist process finalized
+- [ ] **Owner Assigned:** Pattern library owner named and equipped with process docs
+- [ ] **Team Training Planned:** Session scheduled before full enforcement
+
+---
+
+## Sprint Timeline
+
+```
+Phase 1 (Comprehensive Audit)
+├─ Task: Inventory all UI copy from Sprints 1–5
+├─ Task: Forbidden language scan & tone assessment
+├─ Task: Backend API string audit
+└─ Task: Audit results synthesis & gap analysis
+
+Phase 2 (Pattern Library Creation)
+├─ Task: Structure pattern library doc; identify ≥50 patterns
+├─ Task: Write do/don't examples & rationale for each pattern
+├─ Task: Backend string mapping doc
+└─ Task: Library review & refinement
+Phase 3 (Verification Checklist)
+├─ Task: Draft PR checklist & verification process
+├─ Task: Test checklist against Sprints 1–5 for false positives
+├─ Task: Finalize checklist; decide on automation (ESLint vs. manual)
+└─ Task: Checklist documentation & examples
+
+Phase 4 (Governance & Handoff)
+├─ Task: Assign pattern library owner & document responsibilities
+├─ Task: Document quarterly review process & change proposal workflow
+├─ Task: Team training & competency validation
+└─ Task: Sprint review & retrospective
+```
+
+---
+
+## Follow-On Enablement
+- **Future UI work uses the pattern library** as a reference; no need to re-audit or guess at approved copy.
+- **Verification checklist becomes part of PR review** for new features touching user-facing strings.
+- Guardrail and audit sprints (Sprint 7) can reference the checklist to enforce consistency.
+- Regional deployments can reuse the same pattern library with minimal localization changes.
+
+## Known Gaps or Risks
+- Some backend-provided strings may need mapping or overrides; ensure a path to sanitize them.
+- Future features might introduce new terminology, keep the checklist maintained to prevent drift.

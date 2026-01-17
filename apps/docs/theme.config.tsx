@@ -7,7 +7,7 @@ const config: ThemeConfigProps = {
   sidebar: {
     defaultMenuCollapseLevel: 1,
   },
-  footer: "Region Dispatch Documentation",
+  footer: `© ${new Date().getFullYear()} Region Dispatch Documentation`,
 };
 
 export default config;

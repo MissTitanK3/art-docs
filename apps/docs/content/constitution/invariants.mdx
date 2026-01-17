@@ -25,7 +25,7 @@ These must always be true in crisis mode (dispatch entry, active dispatch view):
 3. **No required dropdowns.** All selections must have a sensible default or be optional.
 4. **No jargon in error messages.** Errors must be human-readable and suggest next steps.
 5. **No login-gated viewing of active dispatches.** If someone has the URL, they can see the situation (submit requires auth). *Tradeoff acknowledgment: This increases transparency at the cost of confidentiality. Regions handling sensitive operations may restrict viewing at the perimeter level (VPN, network policy), but never at the core dispatch entry level.*
-6. **PII redaction for unauthenticated viewers.** Screens shown to unauthenticated viewers must omit personally identifying information beyond first name or role label. This preserves transparency and situational awareness while reducing screenshot harm.
+6. **PII redaction for unauthenticated viewers.** Screens shown to unauthenticated viewers must omit personally identifying information and sensitive operational data: names, email, phone, location (to protect responders), and full descriptions. This preserves transparency and situational awareness while reducing screenshot harm.
 7. **No silent failures.** Every action must confirm success or explain failure.
 8. **Entering or exiting lockdown mode must be visible to all users.** Lockdown entry/exit is logged with actor, timestamp, and stated reason.
 9. **Lockdown mode must auto-expire after 24 hours unless explicitly renewed.** This prevents forgotten lockdowns and silent long-term mode drift.

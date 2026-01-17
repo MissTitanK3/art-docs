@@ -1,0 +1,289 @@
+# Crisis vs. Management Mode Strategy
+
+**Status:** 🟢  
+**Date:** 2026-01-17
+
+---
+
+## The Decision
+
+### Both Crisis Mode AND Management Mode in MVP
+
+| Aspect | Decision |
+|--------|----------|
+| Crisis Mode |  Full implementation (default, always available) |
+| Management Mode |  Full implementation (explicitly entered, admin-only) |
+| Scope | Both modes fully specified in Constitution |
+| Implementation | Sprint 0 kickoff |
+| URLs | `/dispatch/*` for crisis, `/admin/*` for management |
+
+---
+
+## Why Both Modes?
+
+### 1. Constitutional Requirement
+The Constitution explicitly defines both as binding specifications. MVP must comply.
+
+### 2. Safety (Scenario 8)
+Prevents admins from being in admin mode during active crisis while forgetting coordination is happening.
+
+### 3. Simplicity
+- 15 total screens (crisis 8 + management 5)
+- Simpler than single UI with complex toggles
+- Clear mental model: "crisis" vs. "admin work"
+
+### 4. Operational Flexibility
+- Different auth per mode (2FA for admin)
+- Different rate limits
+- Future: separate infrastructure if needed
+
+---
+
+## Crisis Mode (Minimal)
+
+### Default for All Users
+Always the starting point. Coordination first.
+
+### 3 Core Screens
+
+**1. Dispatch Creation** (Minimal form)
+- Location + description (required)
+- Photo optional
+- No category selection (post-MVP)
+- Urgency default: normal
+
+**2. Active Dispatch View** (Single incident)
+- Location, description, urgency
+- Allowed: "I'm Responding", "Needs More Help", "Resolved"
+- Prohibited: assign, delete, change category
+
+**3. Active Dispatch List** (All incidents)
+- Most recent first, urgent floats top
+- One action: "I'm Responding"
+- No filtering (all visible)
+
+### Constitutional Requirements Met
+ No admin language  
+ No required dropdowns  
+ All actions reversible  
+ No jargon in errors  
+ Active dispatches visible unauthenticated  
+ All actions confirm success
+
+---
+
+## Management Mode (Admin Configuration)
+
+### Explicitly Entered, Never Default
+Only accessible by admin role. Requires URL navigation.
+
+### 4 Core Screens
+
+**1. Admin Dashboard**
+- Quick navigation to all admin functions
+- Warning banner if incidents active
+- "Back to Crisis" always visible
+
+**2. User Roster** (Create, deactivate)
+- View all responders
+- Deactivate (soft delete, preserves audit)
+- Reset password
+- Invite new user
+
+**3. Regional Settings** (Configure region)
+- Escalation threshold
+- Timezone
+- Public viewing on/off
+- Emergency contact
+
+**4. Audit Log** (Searchable, readonly)
+- All actions (create, update, close, escalate)
+- Actor, timestamp, region
+- No modification or deletion
+- Regional isolation enforced
+
+### Constraints
+❌ No delete users (only deactivate)  
+❌ No modify audit logs  
+❌ No access to other regions  
+❌ No inventory/schedule (post-MVP)
+
+---
+
+## Mode Switching
+
+### Crisis → Management
+1. User clicks "Settings" in crisis mode
+2. Warning if incidents active: "3 active incidents"
+3. User confirms
+4. Navigate to /admin/ URL
+5. Admin mode shows warning banner
+
+### Management → Crisis
+1. User clicks "← Back to Crisis Dashboard"
+2. Return to /dispatch/ URL
+3. Show active incidents
+
+### Lockdown Mode (Exceptional Override)
+- Admin triggers: Forces all users to crisis mode
+- Hides management UI
+- Auto-expires in 24 hours
+- Exit is visible and logged
+
+---
+
+## Integration with B1-B5
+
+### B1 (Backend API Contracts)
+ All 14 endpoints have mode-level permissions
+- Responders create dispatches (crisis)
+- Admins configure (management)
+- Audit endpoint is admin-only
+
+### B2 (Database Schema)
+ Mode filtering via queries
+- Crisis: recent dispatches only
+- Admin: all data, audit logs
+
+### B3 (Authentication)
+ JWT role determines mode access
+- responder → crisis only
+- admin → crisis + management
+- Added `allowed_modes` field to token
+
+### B4 (Offline Support)
+ Crisis mode supports offline
+- Dispatch creation queued locally
+- Management actions require connectivity
+- No conflicts with offline strategy
+
+### B5 (Regional Scope)
+ Mode separation per region
+- /dispatch/us-west-1/
+- /admin/us-west-1/
+- Regional isolation enforced in both modes
+
+---
+
+## Key Decisions Made
+
+| Decision | Rationale | Trade-off |
+|----------|-----------|-----------|
+| Both modes in MVP | Constitutional requirement + safety | More work in Sprint 0 |
+| URL-level separation | Clear visual/cognitive separation | Slightly more routing |
+| Warning banner (not hard block) | Admins need access during crisis | Doesn't prevent accidental entry |
+| Lockdown forces crisis mode | Safety during major incidents | Admin loses access for 24h |
+| No offline in management | Admin actions infrequent | Requires connectivity |
+
+---
+
+## Testing Checklist
+
+### Crisis Mode
+- [ ] Zero admin language in UI
+- [ ] All destructive actions explained
+- [ ] All selections have defaults
+- [ ] Error messages are human-readable
+- [ ] Active dispatches visible unauthenticated
+- [ ] PII redacted for unauthenticated viewers
+- [ ] All actions confirm success
+- [ ] Offline creation works
+
+### Management Mode
+- [ ] Mode always visible in header
+- [ ] Warning banner when incidents active
+- [ ] Quick return path exists
+- [ ] No accidental entry during dispatch
+- [ ] No admin language in crisis mode
+- [ ] Lockdown overrides management mode
+
+### Constitutional Compliance
+- [ ] Scenario 8: Admin in admin mode during crisis gets warning
+- [ ] Lockdown entry visible to all users
+- [ ] Lockdown auto-expires in 24h
+- [ ] Regional isolation enforced
+- [ ] All tabletop scenarios pass
+
+---
+
+## Implementation Timeline
+
+### Sprint 0 (Foundation)
+- [ ] Crisis mode: dispatch creation, list, view
+- [ ] Management mode: user roster, settings, audit log
+- [ ] Mode switching with warning banner
+- [ ] JWT role-based mode access
+- [ ] Regional isolation
+
+### Sprint 1 (Enhancement)
+- [ ] Escalation in crisis mode
+- [ ] Photo upload in crisis mode
+- [ ] Lockdown mode trigger
+- [ ] Manual lockdown exit
+- [ ] Password reset flow
+
+### Sprint 2+ (Post-MVP)
+- [ ] Inventory management
+- [ ] Schedule management
+- [ ] Advanced reporting
+- [ ] Role configuration UI
+
+---
+
+## FAQ
+
+### Q: Can a responder accidentally enter management mode?
+**A:** No. Only users with admin role can access /admin/. Non-admins get 403 Forbidden.
+
+### Q: What if lockdown is triggered during a crisis?
+**A:** All users stay in crisis mode (already default). Management UI simply hides. Full dispatch functionality remains.
+
+### Q: Can an admin be in management mode if lockdown is active?
+**A:** No. Lockdown forces all users (including admins) to crisis mode.
+
+### Q: Do offline submissions work in management mode?
+**A:** No. Management mode requires connectivity. Only crisis mode (dispatch creation) supports offline with IndexedDB queue.
+
+### Q: How does warning banner know there are active incidents?
+**A:** On navigation to /admin/, backend returns active incident count (derived from dispatch table WHERE region_id = ? AND status = 'open').
+
+### Q: Can regional admins from Portland access Denver settings?
+**A:** No. JWT token includes `allowed_regions: ["us-west-1"]`. Attempt to access other region's settings → 403 Forbidden.
+
+### Q: Is there a transition screen when lockdown expires?
+**A:** No. After 24h, system automatically lifts lockdown. Users can then access management mode if they navigate away and back.
+
+### Q: What if user loses connection while in management mode?
+**A:** Session persists. User must reconnect to continue. No local queue for admin actions. Clear error: "Settings unavailable — check connection."
+
+---
+
+## Constitution Alignment
+
+**From Modes Document:**
+
+> "Crisis Mode is the default because coordination is the priority. Lockdown Mode protects focus, not authority."
+
+ **Fully implemented:** Crisis mode is default, lockdown forces crisis focus.
+
+---
+
+**From Invariants Document:**
+
+> "Entering or exiting lockdown mode must be visible to all users."
+
+ **Fully implemented:** Banner shows "Lockdown Mode Active" to all. Entry/exit logged with actor + timestamp.
+
+---
+
+**From PR Review Template:**
+
+> "Mode separation enforcement: Crisis URLs distinct from admin URLs."
+
+ **Fully implemented:** `/dispatch/*` vs `/admin/*` with clear URL differentiation.
+
+---
+
+## Blocker #6 Complete 
+
+All decision points resolved. Both crisis and management modes fully specified. Ready for Sprint 0 kickoff implementation.

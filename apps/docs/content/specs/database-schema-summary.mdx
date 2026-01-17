@@ -1,0 +1,307 @@
+# Database Schema & Persistence
+
+**Date:** 2026-01-17  
+**Status:** 🟢
+
+---
+
+## What Was Blocking
+
+The database schema was undefined. This created critical risk:
+
+- Backend couldn't implement persistence layer
+- No clear contract between API and database
+- Offline sync strategy unclear (conflict resolution unknown)
+- No audit trail design for accountability (Sprint 7 dependency)
+- Soft delete vs. hard delete undefined
+
+---
+
+## Resolution: Database Schema & Persistence Specification
+
+A comprehensive database specification is now available: [Database Schema & Persistence](/specs/database-schema)
+
+### Coverage
+
+** Entity Relationship Diagram (ERD)**
+- Visual representation of all tables and relationships
+- Clear FK dependencies
+- Soft delete pattern
+
+** Five Core Tables with Complete Schemas**
+
+1. **users** - User accounts, roles, region permissions
+   - Fields: id, email, password_hash, role, allowed_regions, created_at, updated_at, last_login_at, is_active
+   - Indexes: email (login), role, is_active, created_at
+
+2. **dispatches** - Core dispatch records with versioning
+   - Fields: id, region_id, submitter_id, client_id (idempotency), location (lat/lon), location_description, location_precision, description, urgency, status, closure_reason, closed_at, closed_by_id, version, created_at, updated_at, is_deleted
+   - Indexes: (region_id, status), (region_id, created_at DESC), submitter, created_at, urgency
+   - Status state machine: open → acknowledged → escalated → closed ← reopened
+   - Soft delete: is_deleted flag instead of hard DELETE
+
+3. **responders** - Junction table (dispatch responders)
+   - Fields: id, dispatch_id, responder_id, region_id, status, claimed_at, updated_at
+   - Unique: (dispatch_id, responder_id) - multiple responders per dispatch allowed
+   - Status transitions: responding → arrived → assisting → cleared
+
+4. **audit_log** - Immutable, append-only event log
+   - Fields: id, dispatch_id, responder_entry_id, region_id, event_type, actor_id, before_state (JSON), after_state (JSON), changed_fields (JSON), timestamp
+   - Event types: dispatch_created, dispatch_updated, responder_joined, dispatch_closed, dispatch_escalated, location_updated, urgency_updated, etc.
+   - Indexes: (dispatch_id, timestamp DESC), region, event_type, actor
+   - Retention: Unlimited (for compliance and accountability)
+
+5. **notification_queue** - Optional, transient queue for SSE delivery
+   - Alternative: Redis list per region
+
+** Data Validation Rules**
+
+| Field | Validation | Example |
+|-------|-----------|---------|
+| location_lat | [-90, 90] | 40.712776 |
+| location_lon | [-180, 180] | -74.005974 |
+| location_precision | exact / block / neighborhood / city | "block" |
+| urgency | low / normal / critical | "critical" |
+| status | Valid transitions only | "open" → "acknowledged" ✓ |
+| description | Max 2000 chars, plain text | "Person collapsed" |
+
+** Conflict Resolution: Last-Write-Wins**
+- Idempotency via `client_id` prevents duplicates on retries
+- Optimistic versioning (version field) detects conflicts (returns 409)
+- Suitable for MVP; can evolve to CRDT post-MVP if needed
+
+** Soft Delete Pattern**
+- `is_deleted = TRUE` instead of hard DELETE
+- Preserves audit trail
+- Records excluded from normal queries
+
+** Indexing Strategy**
+- Query performance targets: list < 100ms, detail < 10ms, pagination < 20ms
+- Compound indexes for most common patterns
+- FK indexes for joins
+
+** Data Retention Policy**
+- Dispatches: 2 years (soft delete → purge)
+- Audit log: Unlimited (compliance requirement)
+
+** Migration Strategy**
+- Phase 1: Create users, dispatches tables (Sprint 0 kickoff)
+- Phase 2: Create responders, audit_log tables + indexes (Sprint 0 stabilization)
+- Phase 3: Add FK constraints after stability (Sprint 0 stabilization)
+
+### Key Design Decisions Made
+
+| Decision | Rationale |
+|----------|-----------|
+| **Last-write-wins** | Simple for MVP; no complex merging logic needed |
+| **Soft deletes** | Preserves audit trail for accountability invariant |
+| **Optimistic versioning** | Prevents silent data loss in concurrent updates |
+| **Compound indexes** | Optimizes most common queries (region + status + time) |
+| **Immutable audit_log** | Ensures accountability; append-only prevents tampering |
+| **JSON for state snapshots** | Flexible; audit log captures any field changes |
+
+### Alignment with Constitution
+
+The schema enforces key invariants:
+
+- **Accountability:** Immutable audit_log records all mutations with actor + timestamp
+- **Offline Support:** Idempotency key + versioning + last-write-wins enable sync
+- **Data Integrity:** FK constraints + status state machine prevent invalid states
+- **Privacy:** Soft deletes preserve historical data while excluding from normal queries
+
+---
+
+## Tables at a Glance
+
+```sql
+users
+  ├─ id, email, password_hash, role, allowed_regions
+  └─ is_active (soft delete flag)
+
+dispatches
+  ├─ id, region_id, submitter_id (→ users)
+  ├─ location: {lat, lon, description, precision}
+  ├─ description, urgency, status
+  ├─ closure_reason, closed_at, closed_by_id
+  ├─ version (optimistic locking)
+  └─ is_deleted (soft delete)
+
+responders (junction: dispatch ↔ user)
+  ├─ id, dispatch_id (→ dispatches), responder_id (→ users)
+  ├─ status (responding/arrived/assisting/cleared)
+  └─ claimed_at, updated_at
+
+audit_log (immutable, append-only)
+  ├─ event_type (created/updated/closed/escalated/etc)
+  ├─ actor_id (→ users, nullable for system events)
+  ├─ before_state, after_state (JSON snapshots)
+  ├─ changed_fields (JSON array)
+  └─ timestamp (immutable)
+
+notification_queue (transient)
+  ├─ event_type, payload (JSON)
+  └─ created_at, delivered_at
+```
+
+---
+
+## Query Examples
+
+### List Active Dispatches in Region (Most Common)
+
+```sql
+SELECT * FROM dispatches
+WHERE region_id = 'us-east-1'
+  AND status IN ('open', 'acknowledged', 'escalated')
+  AND is_deleted = FALSE
+ORDER BY created_at DESC
+LIMIT 50;
+
+Index: (region_id, status, created_at DESC)
+Expected: < 100ms with 1M records
+```
+
+### Get Dispatch Detail with Responders
+
+```sql
+SELECT d.*, 
+       (SELECT COUNT(*) FROM responders r WHERE r.dispatch_id = d.id) as responder_count
+FROM dispatches d
+WHERE d.id = 'dsp_abc123';
+
+Index: Primary key (automatic)
+Expected: < 10ms
+```
+
+### Audit Trail for Dispatch
+
+```sql
+SELECT * FROM audit_log
+WHERE dispatch_id = 'dsp_abc123'
+ORDER BY timestamp DESC;
+
+Index: (dispatch_id, timestamp DESC)
+Expected: < 50ms for 100 events
+```
+
+### Version Conflict Detection (Optimistic Locking)
+
+```sql
+UPDATE dispatches
+SET urgency = 'low', version = version + 1, updated_at = NOW()
+WHERE id = 'dsp_abc123' AND version = 2;
+
+-- If version mismatch, 0 rows affected → client retries with current version
+```
+
+---
+
+## Testing Checklist
+
+**Before Sprint 0 Completes:**
+
+- [ ] Users table: INSERT, SELECT, UPDATE, soft-delete
+- [ ] Dispatches table: INSERT with idempotent client_id, SELECT by region/status, UPDATE with version check
+- [ ] Responders table: INSERT (junction), CASCADE delete, UNIQUE constraint enforced
+- [ ] Audit_log table: INSERT immutable, SELECT with filters, retention verified
+- [ ] FK constraints: Referential integrity enforced
+- [ ] Version field: Increments on UPDATE, 409 on mismatch
+- [ ] Soft delete: Excluded from normal queries, preserved in audit_log
+- [ ] Pagination: Cursor works, no duplicates
+- [ ] Indexes: Query performance within targets (< 100ms list, < 10ms detail)
+- [ ] Region isolation: Queries respect region_id, no cross-region leakage
+- [ ] Status transitions: Invalid transitions rejected (409)
+- [ ] Concurrency: Multiple parallel updates don't corrupt data
+
+---
+
+## Migration Path
+
+**Sprint 0, Phase A:**
+- Create users table
+- Create dispatches table (no FK constraints yet)
+- Add primary key indexes
+
+**Sprint 0, Phase B:**
+- Create responders table
+- Create audit_log table
+- Add all compound indexes
+- Add FK constraints
+
+**Sprint 1:**
+- Monitor query performance
+- Tune indexes if needed
+- Verify audit_log completeness
+
+---
+
+## Integration with API (Blocker #1)
+
+The API endpoints directly map to database queries:
+
+| API Endpoint | Database Query |
+|--------------|----------------|
+| POST /dispatches | INSERT dispatches (with idempotent client_id) |
+| GET /dispatches | SELECT * FROM dispatches (with cursor) |
+| GET /dispatches/:id | SELECT * FROM dispatches WHERE id = ? |
+| PATCH /dispatches/:id | UPDATE dispatches (with version check) |
+| POST /dispatches/:id/respond | INSERT responders |
+| GET /dispatches/:id/responders | SELECT * FROM responders WHERE dispatch_id = ? |
+
+---
+
+## Remaining Blockers (All Resolved ✅)
+
+All critical blockers are now resolved as of 2026-01-17:
+
+- ✅ **Blocker #1:** Backend API Contracts - RESOLVED ([API](/specs/backend-api-contracts))
+- ✅ **Blocker #2:** Database schema - RESOLVED
+- ✅ **Blocker #3:** Authentication & authorization architecture - RESOLVED ([Auth](/specs/authentication-architecture))
+- ✅ **Blocker #4:** Offline support - RESOLVED ([Offline](/specs/offline-support-architecture))
+- ✅ **Blocker #5:** Multi-region scope - RESOLVED ([Regions](/specs/region-scope-architecture))
+- ✅ **Blocker #6:** Crisis & management modes - RESOLVED ([Modes](/specs/crisis-management-mode-strategy))
+
+**Status:** Ready for Sprint 0 implementation. All architectural decisions finalized.
+
+---
+
+## Document Links
+
+- **Specification:** [Database Schema & Persistence](/specs/database-schema)
+- **Blocker List:** [MVP Gaps & Blockers](/roadmap/mvp-gaps-and-blockers)
+- **API Contracts:** [Backend API Contracts](/specs/backend-api-contracts)
+- **Roadmap:** [Roadmap Overview](/roadmap/roadmap-overview)
+
+---
+
+## Next Steps
+
+### For Database Team
+
+- [ ] Review schema and raise clarifications by **2026-01-20**
+- [ ] Create migration scripts (create tables, add indexes, add constraints)
+- [ ] Test migrations on staging database
+- [ ] Prepare performance tuning plan
+
+### For Backend Team
+
+- [ ] Implement persistence layer against this schema
+- [ ] Begin Sprint 0 kickoff with users + dispatches tables
+- [ ] Integrate migrations into CI/CD pipeline
+- [ ] Set up connection pooling and monitoring
+
+### For QA Team
+
+- [ ] Prepare data validation tests (see Testing Checklist)
+- [ ] Set up test data fixtures
+- [ ] Verify audit_log captures all mutations
+
+### For All Teams
+
+- [ ] Validate schema aligns with [Backend API Contracts](/specs/backend-api-contracts) (already done ✓)
+- [ ] Confirm conflict resolution strategy (last-write-wins) acceptable for offline sync
+- [ ] Review soft delete pattern matches audit trail requirements
+
+---
+
+**Next Review:** Sprint 0 kickoff execution checkpoint (2026-01-25).

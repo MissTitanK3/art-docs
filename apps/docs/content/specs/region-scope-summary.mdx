@@ -1,0 +1,406 @@
+# Region Scope Architecture
+
+**Status:** 🟢  
+**Date Resolved:** 2026-01-17  
+
+---
+
+## What Was Blocked
+
+Without clarity on regional scope, deployment and architecture were uncertain:
+
+- ❌ Should MVP launch in 1 region or multiple?
+- ❌ How to handle region-specific configuration?
+- ❌ Can new regions be added without code changes?
+- ❌ How to enforce data isolation across regions?
+- ❌ Should escalation rules vary by region?
+
+**Blocked Until:** Region scope architecture specification completed
+
+---
+
+## What Was Decided
+
+### 1. YES - MVP Launches with MULTIPLE Regions
+
+ **Decision:** MVP launches with 3 initial US regions (not single-region)
+
+**Why multi-region from start:**
+- Constitution designed for "regional variations"
+- Operational need: test multi-region isolation
+- Simpler to design multi-region initially than retrofit
+- Enables cross-region coordination testing
+
+---
+
+### 2. Three Initial US Regions
+
+| Region | Location | Timezone | Status |
+|--------|----------|----------|--------|
+| `us-west-1` | Portland, OR | America/Los_Angeles | MVP |
+| `us-west-2` | Denver, CO | America/Denver | MVP |
+| `us-east-1` | Boston, MA | America/New_York | MVP |
+
+**Why these three:**
+- Geographic spread (coast, mountain, east)
+- Timezone diversity (PT, MT, ET) - tests timezone handling
+- Tests cross-region data isolation
+- Demonstrates multi-region scalability
+
+---
+
+### 3. Single Deployment, Multi-Region Configuration
+
+ **Architecture:** Same codebase, deployed 3 times with different configs
+
+```
+┌─────────────────────────────────────┐
+│  Single Next.js + API Codebase      │
+└─────────────────────────────────────┘
+              ↓
+┌──────────────┬──────────────┬───────────────┐
+│              │              │               │
+▼              ▼              ▼               ▼
+Portland    Denver         Boston         (Future)
+us-west-1   us-west-2     us-east-1     (Post-MVP)
+```
+
+**How it works:**
+- Deploy same container 3 times
+- Set environment variable per region: `REGION_ID=us-west-1`
+- App loads config from environment
+- All queries scoped to that region
+- Single database with `region_id` column on all tables
+
+---
+
+### 4. Region-Specific Configuration (No Code Changes)
+
+ **Decision:** Per-region settings configured via environment variables
+
+**Each region can customize:**
+- Escalation thresholds (10 min Portland, 15 min Denver)
+- Public viewing settings (on/off per region)
+- Notification batching rules
+- Emergency contact number
+- Supported languages (future)
+- Urgency decay timing
+
+**Example:**
+
+```bash
+# Portland (us-west-1) - Urban, faster escalation
+REGION_ID=us-west-1
+ESCALATION_THRESHOLD_MINUTES=10
+ALLOW_PUBLIC_VIEWING=true
+
+# Denver (us-west-2) - Mountain, slower escalation
+REGION_ID=us-west-2
+ESCALATION_THRESHOLD_MINUTES=15
+ALLOW_PUBLIC_VIEWING=true
+```
+
+---
+
+### 5. Adding New Regions (No Code Changes)
+
+ **Decision:** New regions added via configuration only, zero code changes
+
+**To add Austin, TX (post-MVP):**
+
+```bash
+# 1. Set environment variables
+REGION_ID=us-south-1
+PRIMARY_DOMAIN=dispatch.austin.org
+TIMEZONE=America/Chicago
+
+# 2. Deploy same codebase
+docker run dispatch:latest
+
+# 3. Done - no migrations, no schema changes
+```
+
+---
+
+## Region Data Isolation
+
+### Enforced at Multiple Layers
+
+**1. Database layer (region_id on all tables):**
+```sql
+WHERE region_id = 'us-west-1'
+AND is_deleted = FALSE
+```
+
+**2. Application layer (every endpoint checks region):**
+```typescript
+if (!user.allowed_regions.includes(region)) {
+  return 403 Forbidden;
+}
+```
+
+**3. Authentication layer (JWT includes allowed_regions):**
+```json
+{
+  "allowed_regions": ["us-west-1"],
+  "region_id": "us-west-1"
+}
+```
+
+### No Cross-Region Data Leakage
+
+| Data | Same Region | Different Region |
+|------|-------------|------------------|
+| Dispatches |  View/Edit | ❌ 403 Forbidden |
+| Users |  View (admin only) | ❌ 403 Forbidden |
+| Audit logs |  View (admin only) | ❌ 403 Forbidden |
+| Notifications |  Sent to region users | ❌ Not sent |
+
+---
+
+## Regional Configuration Examples
+
+### Escalation Rules by Region
+
+**Portland (urban, quick response):**
+```
+Escalation after 10 minutes with no response
+Path: nearby pod → full region → neighboring regions → all users
+```
+
+**Denver (mountain, slower response):**
+```
+Escalation after 15 minutes with no response
+Path: geographic zone → full region → neighboring regions → all users
+```
+
+**Boston (dense, urgent response):**
+```
+Escalation after 8 minutes with no response
+Path: nearby pod → full region → neighboring regions → all users
+Max 5 concurrent escalations per user (higher than default)
+```
+
+---
+
+## Alignment with B1, B2, B3, B4
+
+### Works with B1 (Backend API Contracts)
+
+ **All 14 endpoints are region-scoped:**
+- Every endpoint includes region checking
+- Regional data returned only to authorized users
+- 403 Forbidden if cross-region access attempted
+
+ **Consistent error handling:**
+- Uses existing error response format
+- Clear messages: "You don't have access to region us-east-1"
+
+---
+
+### Integrates with B2 (Database Schema)
+
+ **All tables have region_id:**
+- Dispatches table: `region_id` on every row
+- Users table: `allowed_regions[]` array
+- Audit log: `region_id` on every entry
+- Responders table: region implicit from dispatch
+
+ **Efficient queries:**
+- Index on `region_id` (fast filtering)
+- Partition by region (scalable to post-MVP)
+
+---
+
+### Extends B3 (Authentication)
+
+ **JWT includes allowed_regions:**
+- Token payload: `"allowed_regions": ["us-west-1"]`
+- Every request validates region access
+- Multi-region users explicitly choose region
+
+ **Permission model supports regions:**
+- Responder in us-west-1 ≠ Responder in us-east-1
+- Admin in us-west-1 can only manage us-west-1 users
+- Cross-region access rejected at auth layer
+
+---
+
+### Complements B4 (Offline Support)
+
+ **Offline submissions respect region:**
+- User in us-west-1 submits offline
+- Queue stored locally with region_id
+- Syncs only to us-west-1 backend
+- No cross-region submission possible
+
+---
+
+## Dependencies Satisfied
+
+ **B5 depends on:**
+- [Backend API Contracts](/specs/backend-api-contracts)  - Provides endpoints to scope
+- [Database Schema](/specs/database-schema)  - Provides region_id field
+- [Authentication Architecture](/specs/authentication-architecture)  - Provides allowed_regions
+
+ **B5 enables:**
+- Multi-region coordination (Sprints 1+)
+- Regional admin dashboards (Sprints 2+)
+- International expansion (post-MVP)
+
+---
+
+## Key Design Decisions
+
+| Decision | Chosen | Alternative | Why |
+|----------|--------|-------------|-----|
+| Single/Multi-region? | Multi-region | Single-region | Constitution requires regional variations |
+| Config: Code or Environment? | Environment | Code changes | Scalable to many regions |
+| New regions: Redeployment? | No redeployment | Rebuild+deploy | Reduce operational burden |
+| Data sharing across regions? | No (isolated) | Partial (federation) | Simpler for MVP, federation in post-MVP |
+| Admin cross-region access? | Denied | Allowed | Respect regional autonomy |
+
+---
+
+## Testing Checklist (Sprint 0)
+
+**Before MVP Launch:**
+
+- [ ] 3 regions successfully isolated in database
+- [ ] User in us-west-1 cannot access us-east-1 data
+- [ ] Admin in us-west-1 cannot see users from us-east-1
+- [ ] Dispatches correctly filtered by region
+- [ ] Audit logs scoped by region
+- [ ] Notifications sent only to region's users
+- [ ] Regional config changes apply without redeployment
+- [ ] Adding new region requires no code changes
+- [ ] All 14 API endpoints respect region boundaries
+- [ ] Cross-region API requests return 403
+
+---
+
+## Implementation Phases
+
+### Phase 1: Sprint 0 (Setup)
+
+**Operations:**
+- [ ] Provision 3 regional environments
+- [ ] Configure DNS for 3 domains
+- [ ] Setup load balancer with region routing
+
+**Backend:**
+- [ ] Implement region-scoped queries
+- [ ] Add region validation middleware
+- [ ] Environment-based config loading
+
+**DevOps:**
+- [ ] Deploy to 3 regions simultaneously
+- [ ] Verify region isolation
+- [ ] Configure health checks per region
+
+**Status:**  Ready for implementation
+
+### Phase 2: Sprint 1+ (Optimization)
+
+**Backend:**
+- [ ] Regional dashboards
+- [ ] Regional analytics
+- [ ] Regional configuration UI (admin only)
+
+**Frontend:**
+- [ ] Display current region in header
+- [ ] Region switching (for multi-region users)
+- [ ] Regional emergency contact display
+
+**Status:**  Ready for implementation
+
+---
+
+## Constitution Compliance
+
+**Regional Variations Principle (System Constitution):**
+
+> "The system should be designed for regional variations from the start."
+
+ **Fully complied:**
+- Designed for regions from ground up
+- Region-specific configuration (no code changes)
+- Regional admin control
+- Region-specific escalation rules
+- Data isolation enforced
+
+---
+
+## Security Considerations
+
+### Cross-Region Attack Prevention
+
+1.  **SQL injection across regions**
+   - All queries include: `WHERE region_id = ?`
+   - Even if injection succeeds, can't escape region
+
+2.  **URL-based region bypass**
+   - User attempts: `GET /dispatches?region=us-east-1`
+   - Server checks: is user allowed?
+   - Returns 403 if not
+
+3.  **Token reuse across regions**
+   - Token valid for auth, but region checked
+   - Token with `allowed_regions: ["us-west-1"]` can't access us-east-1
+
+---
+
+## Post-MVP Enhancements
+
+**Ready for post-MVP (no core changes needed):**
+
+- **More regions:** Add US South, US Mid-West, US South-West
+- **International:** Canada, Mexico, UK, EU
+- **Languages:** Spanish, French per region
+- **Separate instances:** One database per region (federation if needed)
+- **Regional compliance:** GDPR, CCPA per jurisdiction
+- **Regional escalation:** Custom rules per region (already supports)
+
+---
+
+## Next Immediate Actions
+
+1. **Operations:** Provision 3 regional environments (Sprint 0 kickoff)
+2. **DevOps:** Configure DNS + load balancer (Sprint 0 kickoff)
+3. **Backend:** Implement region-scoped queries (Sprint 0 kickoff)
+4. **QA:** Execute cross-region isolation tests (Sprint 0 stabilization)
+
+---
+
+## FAQ
+
+**Q: Can users belong to multiple regions?**  
+A: Yes. JWT token includes `allowed_regions: ["us-west-1", us-west-2"]`. Multi-region users must specify which region for each request.
+
+**Q: Can one user's dispatch be seen by multiple regions?**  
+A: No. Every dispatch belongs to exactly one region. Responders in other regions cannot see it. Regional federation (post-MVP) can enable cross-region visibility if needed.
+
+**Q: What if we need to add a region during MVP?**  
+A: Set environment variables, deploy, done. No code changes required.
+
+**Q: Can admins be multi-region?**  
+A: Yes. Admin with `allowed_regions: ["us-west-1", "us-west-2"]` can manage both regions.
+
+**Q: What about shared resources (user accounts, settings)?**  
+A: Everything is per-region for MVP. A user with same email in us-west-1 and us-east-1 are separate accounts. Post-MVP can implement federated identity if needed.
+
+---
+
+## Related Documents
+
+- [Region Scope Architecture](/specs/region-scope-architecture) - Full specification
+- [Backend API Contracts](/specs/backend-api-contracts) - Region-scoped endpoints
+- [Database Schema](/specs/database-schema) - region_id on all tables
+- [Authentication Architecture](/specs/authentication-architecture) - allowed_regions in JWT
+- [System Constitution](/constitution/system-constitution) - Regional variations principle
+
+---
+
+**Document Status:** 🟢 **READY FOR IMPLEMENTATION**  
+**Version:** 1.0 | **Last Updated:** 2026-01-17  
+**Next Phase:** Sprint 0 kickoff for environmental setup and region-scoped queries

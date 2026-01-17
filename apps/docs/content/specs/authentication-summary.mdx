@@ -1,0 +1,324 @@
+# Authentication Architecture
+
+**Status:** 🟢  
+**Date Resolved:** 2026-01-17  
+
+---
+
+## What Was Blocked
+
+Role-based access control, user session management, and multi-region user isolation were undefined. These blockers are now resolved:
+
+- Role-based features (who can do what) — Three core roles defined: Responder, Admin, Viewer
+- User session lifecycle (login/logout/expiry) — Complete lifecycle specified with refresh strategy
+- Multi-region access restrictions — Region scoping rules enforced for all data
+- Permission enforcement on API endpoints — Permission matrix defined for all 14 endpoints
+- Admin vs. responder feature separation — Clear role permissions and access boundaries
+
+**Resolved By:** [Authentication Architecture](/specs/authentication-architecture) specification (Sprint 0 ready)
+
+---
+
+## What Was Decided
+
+### 1. Authentication Method: JWT + HttpOnly Cookies
+
+```
+ JWT tokens (HS256 algorithm)
+ Stored in HttpOnly secure SameSite cookies (not localStorage)
+ 1-hour expiry (aligned with B1 API spec)
+ Refresh via GET /auth/session before expiry
+```
+
+**Why:** Balances security (XSS-safe) with simplicity (no server-side session store needed for MVP).
+
+---
+
+### 2. Three Core Roles with Defined Permissions
+
+**Responder** (default)
+-  Create/update/close dispatches
+-  Signal responding and update status
+- ❌ Cannot view user list or audit logs
+
+**Admin** (coordinator)
+-  Do everything responder can
+-  Manage users (create, edit, deactivate)
+-  View audit logs and system health
+-  Access management mode (override/configuration)
+
+**Viewer** (optional, post-MVP)
+-  Read-only access to dispatches
+-  No PII (names hidden, "Responder #1" style)
+
+**Unauthenticated** (public)
+-  View dispatch list if region allows public_viewing
+-  See urgency and status
+- ❌ Cannot see location (protects responder safety)
+- ❌ Cannot see names, email, phone, full descriptions
+
+---
+
+### 3. Session Lifecycle
+
+**Login:**
+```
+POST /auth/login (email, password, region_id)
+  → Validate credentials
+  → Generate JWT token (1 hr expiry)
+  → Set HttpOnly cookie
+  → Return user object + token
+```
+
+**Refresh (every 15 min):**
+```
+GET /auth/session
+  → If token expiring < 5 min, generate new token
+  → Return in Set-Cookie header
+  → If expired, return 401 (redirect to login)
+```
+
+**Logout:**
+```
+POST /auth/logout
+  → Create audit log entry
+  → Clear HttpOnly cookie (Max-Age=0)
+  → Return 204
+```
+
+---
+
+### 4. Multi-Region User Isolation
+
+**Core Rule:** Users can ONLY access their assigned regions.
+
+```
+User: allowed_regions = ["us-east-1"]
+
+GET /dispatches?region=us-east-1   ALLOWED
+GET /dispatches?region=us-west-2  ❌ FORBIDDEN (403)
+```
+
+**Single-region users** get implicit filtering (no region param needed).  
+**Multi-region users** must explicitly specify region in requests.
+
+**All data scoped by region:**
+-  Dispatches (WHERE region_id = user's region)
+-  Audit logs (filtered by region)
+-  User list (only users in same region)
+-  Settings (region-specific configuration)
+
+---
+
+### 5. Permission Model (All 14 API Endpoints)
+
+| Endpoint | Responder | Admin | Viewer | Public |
+|----------|-----------|-------|--------|--------|
+| POST /auth/login |  |  |  |  |
+| POST /auth/logout |  |  |  | — |
+| GET /auth/session |  |  |  | — |
+| POST /dispatches |  |  | ❌ | ❌ |
+| GET /dispatches |  |  |  | * |
+| GET /dispatches/:id |  |  |  | * |
+| PATCH /dispatches/:id |  |  | ❌ | ❌ |
+| POST /dispatches/:id/respond |  |  | ❌ | ❌ |
+| PATCH /dispatches/:id/respond/:rid | ❌** |  | ❌ | ❌ |
+| GET /notifications/stream |  |  |  | — |
+| GET /users | ❌ |  | ❌ | ❌ |
+| POST /users | ❌ |  | ❌ | ❌ |
+| PATCH /users/:id | ❌ |  | ❌ | ❌ |
+| GET /audit | ❌ |  | ❌ | ❌ |
+
+\* If region.allow_public_viewing = true  
+\** Responder can update own status only (claimed_at immutable); Admin can override any responder
+
+---
+
+## How It Aligns With B1 & B2
+
+### Alignment with B1 (Backend API Contracts)
+
+ **Auth endpoints match B1:**
+- B1 defines: POST /auth/login, /logout, GET /auth/session
+- B3 specifies: JWT tokens, HttpOnly cookies, refresh strategy
+- **Result:** B1 auth endpoints are now fully implemented
+
+ **Permission model covers all 14 endpoints:**
+- B1 defines: 14 REST endpoints
+- B3 specifies: Who can call each endpoint (permission matrix)
+- **Result:** All B1 endpoints have clear access rules
+
+ **Token expiry timing consistent:**
+- B1 spec says: "1 hour JWT expiry"
+- B3 confirms: 3600 second expiry (1 hr)
+- **Result:** No conflicts
+
+---
+
+### Alignment with B2 (Database Schema)
+
+ **users table schema matches B3 roles:**
+- B2 defines: `role ENUM('responder', 'admin', 'viewer')`
+- B3 specifies: Permission model for each role
+- **Result:** Database schema supports all 3 roles
+
+ **allowed_regions field enables multi-region isolation:**
+- B2 defines: `allowed_regions JSON NOT NULL` on users table
+- B3 specifies: Users can only access their allowed_regions
+- **Result:** Multi-region enforcement is database-enforced
+
+ **region_id on dispatches enables region scoping:**
+- B2 defines: `region_id VARCHAR(32) NOT NULL` on dispatches
+- B3 specifies: All queries filtered by region_id + user's allowed_regions
+- **Result:** Region isolation is enforceable
+
+ **Audit log supports auth events:**
+- B2 defines: audit_log table with before/after state snapshots
+- B3 specifies: Log all auth events (login, logout, token refresh, permission denied)
+- **Result:** Audit trail captures security events
+
+---
+
+## Decision Timeline
+
+| Decision | Made By | Rationale | Alternatives Rejected |
+|----------|---------|-----------|----------------------|
+| JWT + HttpOnly | Security best practices | XSS-safe, no server session store | localStorage (XSS vulnerable), OAuth2 (overkill) |
+| 3 core roles | System Constitution | Responder ↔ Admin ↔ Viewer separation | RBAC (too complex), unlimited roles |
+| 1 hour expiry | Token size/expiry tradeoff | Balances security and UX | 5 min (too strict), 24 hr (too risky) |
+| Region-scoped access | Multi-region requirement | Users only see their regions | No scoping (privacy breach), global access (wrong model) |
+| Last-write-wins + idempotency | From B2 conflict resolution | Simplest for MVP | Operational transform (too complex) |
+
+---
+
+## Integration Points
+
+**B3 impacts:**
+
+1. **Backend team** must implement:
+   - POST /auth/login, /logout, GET /auth/session endpoints
+   - JWT generation and validation
+   - Permission check middleware on all endpoints
+   - Region-scoped queries
+   - Audit logging for all auth events
+
+2. **Frontend team** must implement:
+   - Login form with email/password
+   - Session check on app startup (GET /auth/session)
+   - Token refresh loop (every 15 min)
+   - Logout flow
+   - 401/403 error handling
+
+3. **QA team** must test:
+   - All permission combinations (responder/admin/viewer/public)
+   - Multi-region access rules
+   - Session expiry and refresh
+   - Error responses for 401/403
+
+4. **DevOps team** must configure:
+   - JWT_SECRET environment variable (secure storage)
+   - HTTPS (required for Secure cookies)
+   - Rate limiting on /auth/login (prevent brute force)
+   - CORS headers
+
+---
+
+## Dependencies Satisfied
+
+ **B3 depends on:**
+- [Database Schema](/specs/database-schema) - users table with role/allowed_regions fields
+- [Backend API Contracts](/specs/backend-api-contracts) - auth endpoints already defined
+
+ **B3 enables:**
+- Role-based features (Sprints 1+)
+- Admin management workflows (Sprints 2+)
+- Audit compliance (Sprints 2+)
+- Multi-region security (Sprint 0+)
+
+---
+
+## Security Decisions
+
+ **Password hashing:** bcrypt with cost factor 12 (slow intentional)  
+ **Token storage:** HttpOnly cookies (not localStorage)  
+ **Token signing:** HS256 with strong secret (>32 bytes)  
+ **Rate limiting:** Max 5 login attempts per 15 min per IP  
+ **Error messages:** Generic "Invalid credentials" (no email/password hints)  
+ **Logout:** Clears cookie immediately (post-MVP: deny-list for immediate revocation)  
+
+**Security review:** Required before Sprint 0 kickoff (TBD)
+
+---
+
+## Blockers Unblocked
+
+With B3 resolved:
+
+-  **Role-based features:** Can now implement feature flags per role
+-  **User management:** Admin can now create/edit/deactivate users
+-  **Audit compliance:** All actions can now be attributed to user + timestamp
+-  **Multi-region safety:** Different admins cannot access each other's regions
+-  **Permission enforcement:** All API endpoints have defined access rules
+
+---
+
+## Testing Checklist (Sprint 0 kickoff)
+
+**Must-Pass Before Proceeding:**
+
+- [ ] Login with valid credentials returns token + sets cookie
+- [ ] Login with invalid credentials returns 401
+- [ ] Responder cannot view user list (403)
+- [ ] Admin can view user list (200)
+- [ ] Cross-region access denied (403)
+- [ ] Token refresh works (GET /auth/session returns new token)
+- [ ] Token expiry triggers redirect to login (401)
+- [ ] Logout clears cookie and returns 204
+- [ ] Unauthenticated user can view dispatches (200, if public_viewing enabled)
+- [ ] All error responses use standardized format
+
+---
+
+## Next Immediate Actions
+
+1. **Security team:** Review auth architecture (target: 2026-01-19)
+2. **Backend team:** Begin implementation (target: Sprint 0 kickoff)
+3. **Frontend team:** Create login form + session management (target: Sprint 0 kickoff)
+4. **DevOps team:** Configure JWT_SECRET + HTTPS + rate limiting (target: Sprint 0 kickoff)
+
+---
+
+## FAQ
+
+**Q: Can a user have multiple roles?**  
+A: No. For MVP, role is singular (`role ENUM`). Post-MVP: Implement role + permissions table for multi-role support.
+
+**Q: What happens to sessions when user is deactivated?**  
+A: Existing tokens remain valid until expiry (1 hr). Post-MVP: Implement deny-list for immediate revocation.
+
+**Q: Can a responder reset their own password?**  
+A: Not in MVP. Password reset endpoint (POST /auth/forgot-password) can be added in Sprints 1-2.
+
+**Q: Is 2FA required for MVP?**  
+A: No. Can be added in Sprints 2-3 as security enhancement.
+
+**Q: Can users belong to multiple regions?**  
+A: Yes. allowed_regions is a JSON array. Multi-region users must specify region in requests.
+
+**Q: How do we handle timezone differences?**  
+A: All timestamps stored in UTC. Frontend converts to local timezone for display.
+
+---
+
+## Related Documents
+
+- [Authentication Architecture](/specs/authentication-architecture) - Full specification (implementation guide)
+- [Backend API Contracts](/specs/backend-api-contracts) - 14 REST endpoints
+- [Database Schema](/specs/database-schema) - users table schema
+- [Sprint 0 Quick Start](/specs/sprint-0-quickstart) - Kickoff tasks for each team
+
+---
+
+**Document Status:** 🟢 **READY FOR IMPLEMENTATION**  
+**Version:** 1.0 | **Last Updated:** 2026-01-17  
+**Next Review:** Sprint 0 stabilization phase (post-implementation validation)

@@ -1,0 +1,356 @@
+# Offline Support Architecture
+
+**Status:** 🟢  
+**Date Resolved:** 2026-01-17  
+
+---
+
+## What Was Blocked
+
+Without clarity on offline support, Sprint planning was blocked:
+
+- ❌ Should Sprint 5 (Offline & Sync) be part of MVP?
+- ❌ What conflict resolution strategy? (last-write-wins vs. merge)
+- ❌ How to implement sync retries? (auto vs. manual)
+- ❌ How to prevent duplicate submissions?
+- ❌ UI/UX for offline queue management?
+
+**Blocked Until:** Offline support architecture specification completed
+
+---
+
+## What Was Decided
+
+### 1. YES - MVP Includes Offline Submission Support
+
+ **Decision:** Offline support is part of MVP, implemented in two phases:
+
+- **Sprint 0:** Foundation (local storage, offline indicator, manual retry)
+- **Sprint 1:** Full implementation (auto-retry, exponential backoff, sync UI)
+
+### 2. Why Include Offline
+
+**Constitutional requirement:** "Offline behavior must be predictable" ([System Constitution](/constitution/system-constitution))
+
+**Practical need:** Field workers operate in areas with spotty coverage
+- Hiking trails (no signal)
+- Rural areas (intermittent coverage)
+- Underground locations (subway, caves)
+- Remote coordinates (wilderness)
+
+**User expectation:** Modern apps handle offline gracefully
+
+**Testable:** Tabletop Scenario #3 validates offline design
+
+### 3. Conflict Resolution: Last-Write-Wins
+
+ **Decision:** Simple last-write-wins strategy (no merge logic for MVP)
+
+**How it works:**
+- Client submits offline with unique `client_id`
+- Server uses client_id for idempotency (no duplicates)
+- If version conflict detected: most recent timestamp wins
+- If user's offline change loses: show notification, allow fetch + retry
+
+**Why last-write-wins:**
+1. Simple (no merge logic needed)
+2. Predictable (user's latest action is what matters)
+3. Sufficient for MVP (single-author edits are common)
+4. Respects user agency (clear when conflicts occur)
+
+### 4. Sync Strategy: Auto-Retry with Exponential Backoff
+
+ **Decision:** Automatic retry on reconnect, with exponential backoff
+
+**Retry timing:**
+- 1st attempt: 30 seconds
+- Attempts 2-10: every 2 minutes
+- Attempts 11+: every 15 minutes
+- Max: 24 hours (then prompt user)
+
+**Why auto-retry:**
+1. User shouldn't have to manually sync multiple times
+2. Exponential backoff prevents server hammering
+3. After 24 hours, user explicitly decides whether to keep trying
+4. Constitution requires: "Sync is always clearly automatic or manual"
+
+### 5. Idempotency: Client-Generated ID
+
+ **Decision:** Every offline submission gets unique `client_id` for deduplication
+
+**Implementation:**
+```
+POST /dispatches
+{
+  "client_id": "cli_abc123_1642430400",
+  "location": {...},
+  "description": "..."
+}
+```
+
+**Server deduplication:**
+- Check: does client_id already exist?
+- If YES: return same dispatch_id (idempotent)
+- If NO: create new dispatch
+
+**Why client_id:**
+1. Works offline (no server ID generation needed)
+2. Prevents duplicates on retry
+3. Simple database table for dedup tracking
+
+---
+
+## Offline Architecture Summary
+
+```
+User Offline → Create Dispatch → Save Locally → Show "Saved offline"
+                    ↓
+              Exponential Backoff Retry Loop
+                    ↓
+            Online? Try POST /dispatches
+              ↙            ↘
+          Success         Failure (5xx/timeout)
+           (201)          ↓
+            ↓           Keep Retrying
+          Synced
+           (show dispatch in list)
+```
+
+---
+
+## Alignment with B1, B2, B3
+
+### Works with B1 (Backend API Contracts)
+
+ **No new endpoints needed:**
+- Uses existing POST /dispatches
+- Adds optional `client_id` parameter
+- B1 accepts: `"client_id": "cli_abc123_1642430400"`
+
+ **Same authentication:**
+- Offline submissions sent with JWT token
+- B3 JWT tokens work for offline retry
+
+ **Same error handling:**
+- Uses existing error response format from B1
+- 5xx errors trigger auto-retry
+- 4xx errors stop retrying
+
+---
+
+### Integrates with B2 (Database Schema)
+
+ **New submissions_received table:**
+```sql
+CREATE TABLE submissions_received (
+  client_id VARCHAR(64) PRIMARY KEY,
+  dispatch_id VARCHAR(32),
+  received_at TIMESTAMP,
+  submitter_id VARCHAR(32),
+  FOREIGN KEY (dispatch_id) REFERENCES dispatches(id)
+);
+```
+
+ **Uses version field for conflicts:**
+- B2 has: `version` field on dispatches
+- B4 uses: `version` for optimistic locking
+- 409 Conflict response when version mismatch
+
+ **Audit log captures offline submissions:**
+- B2 has: audit_log table
+- B4 logs: every offline submission attempt (retries included)
+
+---
+
+### Complements B3 (Authentication)
+
+ **JWT tokens remain valid:**
+- B3: 1-hour expiry
+- B4: Offline submission reuses same token
+- No auth issues for offline submissions
+
+ **No new roles needed:**
+- Same responder/admin/viewer permissions
+- Offline submissions subject to same access control
+
+---
+
+## Key Design Decisions
+
+| Decision | Chosen | Alternative | Why |
+|----------|--------|-------------|-----|
+| Include offline? |  YES | NO (online-only) | Constitution requirement |
+| Conflict resolution | Last-write-wins | Server merge/CRDT | Simple for MVP |
+| Sync trigger | Auto-retry | Manual button | Better UX |
+| Retry timing | Exponential backoff | Linear/fixed | Prevents server load |
+| Deduplication | client_id | Timestamp-based | Works offline |
+| Retry limit | 24 hours | No limit/1 hour | Reasonable user action point |
+
+---
+
+## Dependencies Satisfied
+
+ **B4 depends on:**
+- [Backend API Contracts](/specs/backend-api-contracts)  - defines POST /dispatches
+- [Database Schema](/specs/database-schema)  - provides version field + audit log
+- [Authentication Architecture](/specs/authentication-architecture)  - JWT tokens for offline retry
+
+ **B4 enables:**
+- Field workers to submit reports offline (Sprint 1)
+- Improved UX for remote areas (Sprint 1+)
+- Tabletop Scenario #3 validation (post-deployment)
+
+---
+
+## Implementation Phases
+
+### Phase 1: Sprint 0 (Foundation)
+
+**Backend:**
+- [ ] Add `client_id` to dispatch schema
+- [ ] Create submissions_received dedup table
+- [ ] Implement idempotency check in POST /dispatches
+
+**Frontend:**
+- [ ] Add offline queue local storage
+- [ ] Show offline indicator banner
+- [ ] Manual [Retry] button
+
+**Status:** Ready for implementation
+
+### Phase 2: Sprint 1 (Full Implementation)
+
+**Backend:**
+- [ ] Implement version-based conflict detection (409 responses)
+- [ ] Add retry tracking to audit log
+
+**Frontend:**
+- [ ] Implement exponential backoff retry loop
+- [ ] Network detection + auto-sync on reconnect
+- [ ] Pending submissions queue UI
+- [ ] Sync status indicators
+- [ ] [Sync Now] / pull-to-refresh
+- [ ] 24-hour user action prompt
+
+**QA:**
+- [ ] Test all offline scenarios
+- [ ] Stress test with 50+ pending submissions
+- [ ] Verify no data loss on app restart
+
+**Status:** Ready for implementation
+
+### Phase 3: Post-MVP (Advanced Conflict Resolution)
+
+**Sprint 5+ enhancements (not MVP):**
+- [ ] Server-side merge logic
+- [ ] CRDT-based conflict resolution
+- [ ] Conflict UI showing both versions
+
+---
+
+## Constitution Compliance
+
+**Offline Invariants (from System Constitution):**
+
+1.  **Queued submissions persist across app restart**
+   - Implementation: IndexedDB local storage survives close
+   - Tested: App restart with pending queue
+
+2.  **Offline status visible before user starts typing**
+   - Implementation: Banner shown on app open
+   - Tested: Network off, app loads, banner visible
+
+3.  **Sync failure never silently discards data**
+   - Implementation: Stored locally, error shown, manual retry available
+   - Tested: Force sync failure, data retained
+
+4.  **Retry always manual or clearly automatic**
+   - Implementation: Auto-retry with attempt counter ("attempt 2/288")
+   - Tested: See retry count update every retry
+
+**Design Principle Complied:**
+> "Offline behavior must be predictable" 
+
+---
+
+## Security Considerations
+
+ **Local storage security:**
+- Non-sensitive data only (location, description, urgency)
+- Passwords/tokens never stored locally
+- Use IndexedDB (more secure than localStorage)
+
+ **Idempotency key security:**
+- `client_id` is non-sensitive (not a token)
+- Transmitted in request body (visible but not auth-critical)
+- Unique per submission (prevents abuse)
+
+ **Offline attack surface:**
+- No new attack vectors introduced
+- Authentication still required on sync
+- Version field prevents stale data
+
+---
+
+## Testing Checklist (Sprint 1 stabilization)
+
+**Must-Pass Before Proceeding:**
+
+- [ ] Create offline dispatch, data persists across app restart
+- [ ] Offline submission syncs when back online
+- [ ] Submit same offline dispatch twice, only one created on server
+- [ ] 500 error triggers auto-retry with backoff
+- [ ] 400 error stops retrying, shows error message
+- [ ] Network disconnect shows offline banner
+- [ ] Network reconnect triggers immediate sync attempt
+- [ ] Retry count increments with each attempt
+- [ ] After 24 hours, user prompted for action
+- [ ] No ambiguous or silent failures
+
+---
+
+## Next Immediate Actions
+
+1. **Backend Team:** Create submissions_received table (Sprint 0 stabilization)
+2. **Frontend Team:** Implement offline queue storage (Sprint 0 stabilization)
+3. **Frontend Team:** Full retry implementation (Sprint 1 kickoff)
+4. **QA Team:** Execute test plan (Sprint 1 stabilization)
+
+---
+
+## FAQ
+
+**Q: Do users need to explicitly sync, or is it automatic?**  
+A: Automatic. Exponential backoff retries every 30s-15m depending on attempt. User can manually retry anytime. After 24h, user decides whether to keep trying.
+
+**Q: What if user loses phone while offline?**  
+A: Data is queued locally until they log into same device again. When app reopens and connects, pending submissions sync. If they lose the device permanently, data is lost (inherent to local queue).
+
+**Q: Can multiple users submit offline to the same dispatch?**  
+A: Each submission is independent. If User A and User B both go offline and edit the same dispatch, their edits will conflict on server. First to sync wins (last-write-wins). Loser gets 409 Conflict response with option to retry.
+
+**Q: What about very old offline submissions that have been pending for many days?**  
+A: After 24 hours, user is prompted: "Keep Trying / Save / Discard". If they keep trying beyond 24 hours, retries continue. No automatic discard.
+
+**Q: Can we do more sophisticated conflict resolution (merge)?**  
+A: Yes, but that's post-MVP. For now, last-write-wins is predictable and sufficient.
+
+**Q: What if user has very old client app version?**  
+A: Offline support is transparent. Old versions still work online. Offline submissions added in Sprint 1 when all clients are updated.
+
+---
+
+## Related Documents
+
+- [Offline Support Architecture](/specs/offline-support-architecture) - Full specification (implementation guide)
+- [Backend API Contracts](/specs/backend-api-contracts) - POST /dispatches endpoint
+- [Database Schema](/specs/database-schema) - version field + audit log
+- [System Constitution](/constitution/system-constitution) - Offline design principle
+- [Offline Guarantees](/specs/offline-guarantees) - Constitutional guarantees
+- [Tabletop Scenario 3](/compliance/tabletop-scenarios#scenario-3-offline-submission-in-remote-area) - Offline scenario test
+
+---
+
+**Document Status:** 🟢 **READY FOR IMPLEMENTATION**  
+**Version:** 1.0 | **Last Updated:** 2026-01-17  
+**Next Phase:** Sprint 0 stabilization for foundation, Sprint 1 for full implementation

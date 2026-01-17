@@ -1,6 +1,44 @@
 {
+  "BLOCKER-RESOLUTION-INDEX": "Blocker Resolution Index",
+
+  "---1": {
+    "type": "separator",
+    "title": "Backend Layer"
+  },
+  "backend-api-contracts": "Backend API Contracts",
+  "database-schema": "Database Schema",
+  "api-contracts-summary": "API Contracts Summary",
+  "database-schema-summary": "Database Schema Summary",
+  "---2": {
+    "type": "separator",
+    "title": "Security & Access"
+  },
+  "authentication-architecture": "Authentication Architecture",
+  "authentication-summary": "Authentication Summary",
+  "---3": {
+    "type": "separator",
+    "title": "Client & Offline"
+  },
+  "offline-support-architecture": "Offline Support Architecture",
+  "offline-support-summary": "Offline Support Summary",
+  "offline-guarantees": "Offline Guarantees",
+  "---4": {
+    "type": "separator",
+    "title": "Operations & Scale"
+  },
+  "region-scope-architecture": "Region Scope Architecture",
+  "region-scope-summary": "Region Scope Summary",
+  "---5": {
+    "type": "separator",
+    "title": "Product & UX"
+  },
+  "crisis-management-mode-strategy": "Crisis & Management Mode Strategy",
+  "mode-strategy-summary": "Mode Strategy Summary",
+  "---6": {
+    "type": "separator",
+    "title": "Reference Flows"
+  },
   "minimal-dispatch-flow": "Minimal Dispatch Flow",
   "urgency-model": "Urgency Model",
-  "escalation-state-machine": "Escalation State Machine",
-  "offline-guarantees": "Offline Guarantees"
+  "escalation-state-machine": "Escalation State Machine"
 }

@@ -1,0 +1,405 @@
+# MVP Blocker Resolution Index
+
+**Date:** 2026-01-17  
+**Status:** 🟢 **ALL 6 CRITICAL BLOCKERS RESOLVED - 100% COMPLETE**
+
+---
+
+## Quick Navigation
+
+ **[Sprint 0 Quick Start](/roadmap/sprint_0/sprint_0)** - Per-team kickoff tasks, Q&A, success criteria
+
+| # | Blocker | Status | Document | Owner |
+|---|---------|--------|----------|-------|
+| 1 | Backend API Contracts | 🟢 | [Spec](/specs/backend-api-contracts) | Backend |
+| 2 | Database Schema | 🟢 | [Spec](/specs/database-schema) | Database |
+| 3 | Auth Architecture | 🟢 | [Spec](/specs/authentication-architecture) | Security |
+| 4 | Offline Support | 🟢 | [Spec](/specs/offline-support-architecture) | Frontend |
+| 5 | Region Scope | 🟢 | [Spec](/specs/region-scope-architecture) | Operations |
+| 6 | Crisis vs. Management Mode | 🟢|  [Spec](/specs/crisis-management-mode-strategy) | Product |
+
+---
+
+## For Different Roles
+
+### Project Managers / Team Leads
+
+**Start Here:** [Sprint 0 Quick Start Guide](/roadmap/sprint_0/sprint_0)
+
+**Key Insights:**
+-  Backend foundation now ready to build (API + Schema)
+-  Frontend can start with mock server
+- ✅ All 6 blockers resolved (B1-B6 complete)
+- 🚀 Can begin Sprint 0 kickoff immediately
+
+**Action:** 
+- Inform teams they can start implementation immediately
+- All architectural decisions are finalized - no blocking decisions remain
+
+---
+
+### Backend / Database Team
+
+**Start Here:** [Database Schema](/specs/database-schema)
+
+**Implementation Path:**
+1. [Sprint 0 kickoff tasks](/roadmap/sprint_0/sprint_0#sprint-0-kickoff-tasks)
+2. Create users table ([Schema](/specs/database-schema#table-users))
+3. Create dispatches table ([Schema](/specs/database-schema#table-dispatches))
+4. Implement POST /auth/login ([API](/specs/backend-api-contracts#post-authlogin))
+5. Implement POST /dispatches ([API](/specs/backend-api-contracts#post-dispatches))
+
+**Key Docs:**
+- [API: All 14 Endpoints](/specs/backend-api-contracts)
+- [DB: All 5 Tables](/specs/database-schema)
+- [Testing Checklist](/specs/database-schema#testing-checklist)
+
+---
+
+### Frontend / UI Team
+
+**Start Here:** [Backend API Contracts](/specs/backend-api-contracts)
+
+**Implementation Path:**
+1. [Sprint 0 kickoff tasks](/roadmap/sprint_0/sprint_0#sprint-0-kickoff-tasks)
+2. Build mock server from [API Spec](/specs/backend-api-contracts)
+3. Create login component ([POST /auth/login](/specs/backend-api-contracts#post-authlogin))
+4. Create dispatch form ([POST /dispatches](/specs/backend-api-contracts#post-dispatches))
+5. Create dispatch list ([GET /dispatches](/specs/backend-api-contracts#get-dispatches))
+
+**Key Docs:**
+- [API Request/Response Formats](/specs/backend-api-contracts#dispatch-crud-operations)
+- [Error Response Format](/specs/backend-api-contracts#error-response-format)
+- [Pagination Strategy](/specs/backend-api-contracts#pagination--cursors)
+
+---
+
+### QA / Testing Team
+
+**Start Here:** [Testing Checklist](/specs/database-schema#testing-checklist)
+
+**Test Plan:**
+1. [API Contract Verification](/roadmap/sprint_0/sprint_0#sprint-0-kickoff-tasks)
+2. [Database Verification](/roadmap/sprint_0/sprint_0#sprint-0-kickoff-tasks)
+
+**Key Docs:**
+- [API Error Cases](/specs/backend-api-contracts#error-response-format)
+- [DB Validation Rules](/specs/database-schema#data-validation-rules)
+- [Concurrency Tests](/specs/database-schema#testing-checklist)
+
+---
+
+### DevOps / Infrastructure Team
+
+**Start Here:** [Database Deployment](/specs/database-schema#deployment-requirements)
+
+**Setup Tasks:**
+1. Configure MySQL/PostgreSQL (or chosen RDBMS)
+2. Create staging + production environments
+3. Set up migration CI/CD pipeline
+4. Configure monitoring and backups
+5. Prepare health check endpoints ([API: /health](/specs/backend-api-contracts#deployment-requirements))
+
+**Key Docs:**
+- [DB Deployment Requirements](/specs/database-schema#deployment-requirements)
+- [Migration Strategy](/specs/database-schema#migration-strategy)
+- [Connection Pooling](/specs/database-schema#deployment-requirements)
+
+---
+
+## Document Catalog
+
+### Main Specifications (Resolved )
+
+- **[Backend API Contracts](/specs/backend-api-contracts)** - 14 RESTful endpoints (auth, dispatch CRUD, responder signaling, notifications)
+- **[Database Schema](/specs/database-schema)** - 5 tables with complete schemas, indexes, validation rules
+- **[Authentication Architecture](/specs/authentication-architecture)** - JWT tokens, 3 core roles, multi-region isolation, session lifecycle
+- **[Offline Support Architecture](/specs/offline-support-architecture)** - Local queuing, exponential backoff, last-write-wins conflict resolution
+- **[Region Scope Architecture](/specs/region-scope-architecture)** - Multi-region from start, 3 initial US regions, region-scoped configuration
+- **[Crisis vs. Management Mode Strategy](/specs/crisis-management-mode-strategy)** - Two-mode UX (crisis default, management admin-only), mode separation, lockdown override
+
+### Resolution Summaries
+
+- **[API Contracts Summary](/specs/api-contracts-summary)** - How API contracts were defined
+- **[Database Schema Summary](/specs/database-schema-summary)** - How database schema was designed
+- **[Authentication Summary](/specs/authentication-summary)** - How auth architecture was designed
+- **[Offline Support Summary](/specs/offline-support-summary)** - How offline support was designed
+- **[Region Scope Summary](/specs/region-scope-summary)** - How region scope was designed
+- **[Mode Strategy Summary](/specs/mode-strategy-summary)** - How crisis/management modes were designed
+
+### Reference Flows & Models
+
+- **[Minimal Dispatch Flow](/specs/minimal-dispatch-flow)** - Core happy path from creation to resolution
+- **[Urgency Model](/specs/urgency-model)** - Urgency levels and impact on escalation
+- **[Escalation State Machine](/specs/escalation-state-machine)** - State transitions for escalation logic
+- **[Offline Guarantees](/specs/offline-guarantees)** - Guarantees for offline-first operations
+
+### Quick Start Guides
+
+- **[Sprint 0 Quick Start](/roadmap/sprint_0/sprint_0)** - Per-team kickoff tasks, Q&A, success criteria
+
+### Reference Documents
+
+- **[MVP Gaps & Blockers](/roadmap/mvp-gaps-and-blockers)** - Master blocker list, all 15 gaps
+- **[Roadmap Overview](/roadmap/roadmap-overview)** - Sprint-level planning
+- **[System Constitution](/constitution/system-constitution)** - Design principles and invariants
+
+---
+
+## Key Metrics
+
+### Blocker Resolution Progress
+
+```
+Progress: 6/6 = 100%  COMPLETE
+
+████████████  (all 6 resolved)
+
+Resolved:
+   B1: Backend API Contracts (2026-01-17)
+   B2: Database Schema (2026-01-17)
+   B3: Authentication Architecture (2026-01-17)
+   B4: Offline Support Architecture (2026-01-17)
+   B5: Region Scope Architecture (2026-01-17)
+   B6: Crisis vs. Management Mode (2026-01-17)
+```
+
+### Work Unblocked
+
+```
+Foundation: 100% Ready
+├─ API endpoints: Specified 
+├─ Database tables: Specified 
+├─ Error handling: Specified 
+├─ Pagination: Specified 
+├─ Versioning: Specified 
+└─ Audit trail: Specified 
+
+Advanced features: Fully specified
+├─ Auth & roles: Specified (JWT, 3 core roles) ✓
+├─ Offline sync: Specified (local queue, exponential backoff) ✓
+├─ Multi-region: Specified (3 US regions) ✓
+└─ Feature scope: Specified (Crisis + Management modes) ✓
+```
+
+---
+
+## Decision Timeline
+
+###  Already Decided (Locked In)
+
+| Decision | Value | Doc |
+|----------|-------|-----|
+| Authentication Method | JWT tokens + HttpOnly cookies | [B1](/specs/backend-api-contracts#authentication--session-management) |
+| Pagination Strategy | Cursor-based (not offset) | [B1](/specs/backend-api-contracts#pagination--cursors) |
+| Versioning Model | Optimistic locking (version field) | [B2](/specs/database-schema#versioning--conflict-resolution) |
+| Soft Delete Pattern | is_deleted flag (not hard delete) | [B2](/specs/database-schema#soft-deletes--data-retention) |
+| Conflict Resolution | Last-write-wins | [B2](/specs/database-schema#offline-sync-sprint-5-if-in-mvp) |
+| Error Format | Standardized JSON with code/message/details | [B1](/specs/backend-api-contracts#error-response-format) |
+| Idempotency | client_id on dispatch creation | [B1](/specs/backend-api-contracts#post-dispatches) |
+| Notifications | Server-Sent Events (SSE) | [B1](/specs/backend-api-contracts#get-notificationsstream-server-sent-events) |
+
+### ✅ Recently Decided
+
+| Decision | Value | Doc | Resolved |
+|----------|-------|-----|----------|
+| **B3: Auth Roles** | JWT + HttpOnly, 3 core roles: responder, admin, viewer | [Auth](/specs/authentication-architecture) | 2026-01-17 |
+| **B4: Offline MVP** | Yes - Two-phase: Phase A (basic), Phase B (advanced) | [Offline](/specs/offline-support-architecture) | 2026-01-17 |
+| **B5: Region Scope** | Multi-region: 3 initial US regions (Portland, Denver, Boston) | [Regions](/specs/region-scope-architecture) | 2026-01-17 |
+| **B6: Modes Scope** | Both Crisis (default) + Management modes (admin-only, URL-separated) | [Modes](/specs/crisis-management-mode-strategy) | 2026-01-17 |
+
+---
+
+## Implementation Checklist
+
+### Can Start Immediately 🚀
+
+- [ ] Backend: Build users table (B2 schema ready)
+- [ ] Backend: Build dispatches table (B2 schema ready)
+- [ ] Backend: Implement auth endpoints (B1 API + B3 auth ready)
+- [ ] Backend: Implement dispatch CRUD (B1 API + B2 schema ready)
+- [ ] Frontend: Create mock server (B1 API ready)
+- [ ] Frontend: Build auth flow (B1 + B3 architecture ready)
+- [ ] Frontend: Build dispatch components (B1 API ready)
+- [ ] Frontend: Plan offline queue UI (B4 architecture ready)
+- [ ] QA: Prepare test plans (B1 + B2 specs ready)
+- [ ] DevOps: Plan multi-region deployment (B5 architecture ready)
+
+### Implementation Roadmap
+
+**Sprint 0 Phase A (Weeks 1-2):**
+- Backend: Users + Dispatches tables + Auth endpoints (B1-B3)
+- Frontend: Mock server + Auth UI + Dispatch list (B1)
+
+**Sprint 0 Phase B (Weeks 3-4):**
+- Backend: Full CRUD + Responder signaling (B1)
+- Frontend: Offline queue setup (B4)
+- Both: Integration testing
+
+**Sprint 1+ (Blocked items now unblocked):**
+- Role-based access control (B3 now complete)
+- Advanced offline features (B4 now complete)
+- Multi-region deployment (B5 now complete)
+- Admin/Management mode UI (B6 now complete)
+
+---
+
+## Common Integration Points
+
+### API → Database Mappings
+
+```
+POST /dispatches
+  ↓
+INSERT INTO dispatches (
+  id, region_id, client_id,
+  location_lat, location_lon,
+  description, urgency, submitter_id
+)
+
+GET /dispatches?region=us-east-1&status=open
+  ↓
+SELECT * FROM dispatches
+WHERE region_id = 'us-east-1'
+  AND status IN ('open', 'acknowledged', 'escalated')
+  AND is_deleted = FALSE
+ORDER BY created_at DESC
+
+PATCH /dispatches/:id (version=2)
+  ↓
+UPDATE dispatches
+SET urgency = ?, version = version + 1
+WHERE id = ? AND version = ? AND region_id = ?
+```
+
+All integration details documented in the individual spec files.
+
+---
+
+## Risk Status
+
+### 🟢 Risks Mitigated (All Resolved ✓)
+
+- "We don't know what to build" → B1 + B2 specify all
+- "API and DB won't align" → Both resolved together 
+- "Data will be lost" → Soft deletes + audit_log 
+- "Concurrent updates will corrupt" → Versioning 
+- "Idempotency won't work" → client_id strategy 
+- "We don't know who can do what" → B3 Architecture [JWT + HttpOnly, 3 core roles]
+- "Offline won't work" → B4 Architecture [Local queuing, exponential backoff, conflict resolution]
+- "Multi-region infrastructure unclear" → B5 Architecture [3 US regions specified]
+- "Feature scope creep" → B6 Strategy [Crisis + Management modes defined]
+
+### ✨ No Risks Still Present
+
+All critical blockers and architectural decisions are now complete. Implementation can proceed with confidence.
+
+---
+
+## Success Criteria (Sprint 0 End)
+
+###  Must Have
+
+- [ ] All 5 database tables created
+- [ ] All 14 API endpoints functional
+- [ ] Pagination working with cursor strategy
+- [ ] Versioning prevents data loss
+- [ ] Audit log captures all mutations
+- [ ] Error responses standardized
+- [ ] Frontend integrated with backend
+- [ ] User authentication implemented (B3)
+- [ ] Offline queueing implemented (B4)
+- [ ] Multi-region deployment ready (B5)
+- [ ] Crisis & Management modes implemented (B6)
+
+---
+
+## Next Steps
+
+### Immediate (Week of Jan 17)
+
+- ✅ Backend/Frontend: Start Sprint 0 kickoff work (all blockers resolved)
+- ✅ QA: Prepare test cases from B1 + B2
+- ✅ Product: B3-B6 decisions finalized and documented
+- ✅ Security: B3 Auth architecture complete
+
+### Sprint 0 Execution (Weeks 1-4)
+
+- Backend: Complete database tables + auth endpoints (Phase A)
+- Frontend: Complete mock server + auth UI + dispatch list (Phase A)
+- Backend: Complete full CRUD + responder signaling (Phase B)
+- Frontend: Complete offline queue implementation (Phase B)
+- QA: Execute test plans and integration tests
+- DevOps: Deploy to staging and verify multi-region setup
+
+---
+
+## Document Downloads / Exports
+
+All specifications are available in `/specs/` directory:
+
+```
+specs/
+├── BLOCKER-RESOLUTION-INDEX.mdx ........ This document (master index)
+├── backend-api-contracts.mdx ............. 14 API endpoints (B1)
+├── database-schema.mdx .................. 5 tables, validation rules (B2)
+├── authentication-architecture.mdx ....... JWT, roles, multi-region (B3)
+├── offline-support-architecture.mdx ...... Local queue, sync logic (B4)
+├── region-scope-architecture.mdx ......... Multi-region setup (B5)
+├── crisis-management-mode-strategy.mdx ... Two-mode UX (B6)
+├── api-contracts-summary.mdx ......... How B1 was designed
+├── database-schema-summary.mdx ....... How B2 was designed
+├── authentication-summary.mdx ......... How B3 was designed
+├── offline-support-summary.mdx ........ How B4 was designed
+├── region-scope-summary.mdx ........... How B5 was designed
+├── mode-strategy-summary.mdx .......... How B6 was designed
+├── minimal-dispatch-flow.mdx ............ Core happy path
+├── urgency-model.mdx .................... Urgency levels
+├── escalation-state-machine.mdx ......... Escalation states
+└── offline-guarantees.mdx ............... Offline guarantees
+```
+
+---
+
+## Support & Questions
+
+### If You Have Questions About...
+
+| Topic | Document | Direct Link |
+|-------|----------|-------------|
+| API endpoints | Backend API Contracts | [See all 14](/specs/backend-api-contracts) |
+| Database tables | Database Schema | [See all 5](/specs/database-schema) |
+| Sprint 0 work | Quick Start Guide | [Kickoff tasks](/roadmap/sprint_0/sprint_0#sprint-0-kickoff-tasks) |
+| Auth architecture | Authentication Architecture | [B3 details](/specs/authentication-architecture) |
+| Offline support | Offline Support Architecture | [B4 details](/specs/offline-support-architecture) |
+| Multi-region setup | Region Scope Architecture | [B5 details](/specs/region-scope-architecture) |
+| Crisis & Management modes | Mode Strategy | [B6 details](/specs/crisis-management-mode-strategy) |
+
+### Contact
+
+- **Backend Architecture:** See [B1 owner](/specs/backend-api-contracts#owners--contacts)
+- **Database Design:** See [B2 owner](/specs/database-schema#owners--contacts)
+- **Product/Decisions:** See [B4, B5, B6 owner](/roadmap/mvp-gaps-and-blockers#owners--contacts)
+- **Security/Auth:** See [B3 owner](/roadmap/mvp-gaps-and-blockers#owners--contacts)
+
+---
+
+## Version History
+
+| Date | Event | Status |
+|------|-------|--------|
+| 2026-01-17 | B1 (Backend API Contracts) resolved | 🟢 |
+| 2026-01-17 | B2 (Database Schema) resolved | 🟢 |
+| 2026-01-17 | B3 (Authentication Architecture) resolved | 🟢 |
+| 2026-01-17 | B4 (Offline Support Architecture) resolved | 🟢 |
+| 2026-01-17 | B5 (Region Scope Architecture) resolved | 🟢 |
+| 2026-01-17 | B6 (Crisis vs. Management Mode Strategy) resolved | 🟢 |
+| 2026-01-17 | **ALL 6 CRITICAL BLOCKERS COMPLETE** | 🟢 6/6 complete |
+| 2026-01-18+ | Sprint 0 kickoff teams begin implementation | ⏳ In Progress |
+
+---
+
+**Current Status:** 🟢 **ALL BLOCKERS RESOLVED** | 6/6 Blockers Complete | Sprint 0 in Full GO Mode
+
+**Last Updated:** 2026-01-17  
+**Next Review:** 2026-01-25 (Sprint 0 kickoff stabilization checkpoint)

@@ -1,0 +1,1024 @@
+# Authentication & Authorization Architecture
+
+**Status:** 🟢  
+**Version:** 1.0  
+**Last Updated:** 2026-01-17  
+**Owner:** Backend/Security Team  
+**Deadline:** Pre-Sprint 0 Implementation  
+
+---
+
+## Overview
+
+This document specifies the complete authentication and authorization architecture required for MVP (Sprints 0-4). This architecture:
+
+- Works seamlessly with [Backend API Contracts](/specs/backend-api-contracts)
+- Integrates with [Database Schema](/specs/database-schema)
+- Enforces [System Constitution](/constitution/system-constitution) invariants
+- Enables role-based access control and multi-region isolation
+- Supports both authenticated and unauthenticated viewing
+
+**Key Principles:**
+- Simplicity for MVP (no OAuth2, no SAML, no complex flows)
+- Security by default (HttpOnly cookies, bcrypt hashing, token expiry)
+- Accountability (all actions logged with actor + timestamp)
+- Inclusive access (unauthenticated users can view with PII redaction)
+- Region isolation (users access only allowed regions)
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────┐
+│  User Login                         │
+│  POST /auth/login                   │
+│  (email, password, region_id)       │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  Backend Auth Service               │
+│  1. Validate credentials            │
+│  2. Generate JWT token              │
+│  3. Create session                  │
+│  4. Return JWT + HttpOnly cookie    │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  Client Storage                     │
+│  ✓ HttpOnly cookie (JWT)            │
+│  ✗ LocalStorage (never)             │
+│  ✗ SessionStorage (never)           │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  Subsequent Requests                │
+│  GET /dispatches                    │
+│  Authorization: Bearer <JWT>        │
+│  (or automatic via cookie)          │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  Backend Authorization Check        │
+│  1. Validate JWT signature          │
+│  2. Check token expiry              │
+│  3. Verify user role                │
+│  4. Verify region access            │
+│  5. Check resource permissions      │
+└────────────┬────────────────────────┘
+             │
+   ┌─────────┴─────────┐
+   ▼                   ▼
+ Allowed          ❌ Denied
+Execute action      Return 401/403
+```
+
+---
+
+## Authentication Method: JWT + HttpOnly Cookies
+
+**Decision:** JWT tokens stored in HttpOnly, Secure, SameSite cookies (not localStorage).
+
+### Why This Choice
+
+| Option | Pros | Cons | Chosen? |
+|--------|------|------|---------|
+| JWT in localStorage | Accessible from JS | Vulnerable to XSS attacks | ❌ NO |
+| JWT in HttpOnly cookie | Secure, automatic, XSS-safe | Can't access from JS |  YES |
+| Session cookies (server-side) | Stateful, revocable | Requires session store | ⏳ Post-MVP |
+| OAuth2/SAML | Enterprise-grade | Overkill for MVP | ❌ NO |
+
+### Token Details
+
+**Token Type:** JWT (JSON Web Token)  
+**Algorithm:** HS256 (HMAC-SHA256)  
+**Issuer:** Your domain (e.g., `dispatch.example.com`)  
+**Audience:** API endpoints (`dispatch-api`)
+
+**Token Payload:**
+```json
+{
+  "sub": "usr_abc123",
+  "email": "responder@example.com",
+  "role": "responder",
+  "allowed_regions": ["us-east-1"],
+  "iat": 1642426320,
+  "exp": 1642429920,
+  "iss": "dispatch.example.com",
+  "aud": "dispatch-api"
+}
+```
+
+**Token Fields:**
+
+| Claim | Type | Example | Purpose |
+|-------|------|---------|---------|
+| `sub` (subject) | String | "usr_abc123" | User ID (unique identifier) |
+| `email` | String | "responder@example.com" | User email (for display) |
+| `role` | String | "responder" | User role (for authorization) |
+| `allowed_regions` | Array | ["us-east-1"] | Regions user can access |
+| `iat` (issued at) | Unix timestamp | 1642426320 | Token creation time |
+| `exp` (expiration) | Unix timestamp | 1642429920 | Token expiry (1 hour) |
+| `iss` (issuer) | String | "dispatch.example.com" | Token issuer |
+| `aud` (audience) | String | "dispatch-api" | Intended audience |
+
+**Token Expiry:** 1 hour (3600 seconds)  
+**Refresh Strategy:** Client calls `GET /auth/session` before expiry; server returns new token if needed
+
+### Cookie Configuration
+
+**Name:** `session`  
+**Value:** JWT token (encrypted or opaque string)  
+**Domain:** Your domain  
+**Path:** `/`  
+**Secure:** `true` (HTTPS only)  
+**HttpOnly:** `true` (JavaScript cannot access)  
+**SameSite:** `Strict` (protect against CSRF)  
+**Max-Age:** 3600 (1 hour)  
+**Partitioned:** `true` (for cross-site requests, if supported)
+
+**Example Set-Cookie Header:**
+```
+Set-Cookie: session=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; 
+            Domain=dispatch.example.com; 
+            Path=/; 
+            Max-Age=3600; 
+            Secure; 
+            HttpOnly; 
+            SameSite=Strict
+```
+
+---
+
+## User Roles and Permissions
+
+### Three Core Roles
+
+**1. Responder** (Default)
+- **Purpose:** Front-line responder (volunteer, staff, community member)
+- **Can:**
+  -  View active dispatches
+  -  Create new dispatches
+  -  Signal "I'm responding"
+  -  Update responder status (arrived, assisting, cleared)
+  -  View other responders (by name only, no email/phone)
+  -  Update dispatch location (if helping)
+  -  Update dispatch urgency (if situation changed)
+  -  Close dispatch (if situation resolved)
+  -  Reopen dispatch (within 15 min of closure)
+- **Cannot:**
+  - ❌ View audit logs
+  - ❌ Manage users
+  - ❌ Configure system settings
+  - ❌ Access management mode
+  - ❌ View other users' information
+  - ❌ Delete dispatches (only close/reopen)
+
+**Example Responder User:**
+```json
+{
+  "id": "usr_abc123",
+  "email": "alex@example.com",
+  "role": "responder",
+  "allowed_regions": ["us-east-1"],
+  "is_active": true,
+  "created_at": "2026-01-15T10:00:00Z"
+}
+```
+
+---
+
+**2. Admin** (Coordinator/Dispatcher)
+- **Purpose:** Regional coordinator managing active situations and users
+- **Can:**
+  -  Do everything a responder can do
+  -  View audit logs (who did what, when)
+  -  Manage users (create, edit, deactivate)
+  -  Configure regional settings
+  -  Access management mode
+  -  Trigger lockdown mode (freeze crisis mode)
+  -  View user list (email, role, status)
+  -  Force-close dispatches
+  -  View system health/statistics
+- **Cannot:**
+  - ❌ Delete users (only deactivate)
+  - ❌ Change global system configuration (multi-region settings)
+  - ❌ Override audit logs
+  - ❌ Access other regions (only assigned regions)
+
+**Example Admin User:**
+```json
+{
+  "id": "usr_xyz789",
+  "email": "jordan@dispatch.org",
+  "role": "admin",
+  "allowed_regions": ["us-east-1", "us-east-2"],
+  "is_active": true,
+  "created_at": "2026-01-10T09:00:00Z"
+}
+```
+
+---
+
+**3. Viewer** (Observer/Guest - Optional, Post-MVP)
+- **Purpose:** Read-only access for observers, auditors, press
+- **Can:**
+  -  View active dispatch list (minimal PII)
+  -  View dispatch details (location, urgency, status only)
+  -  See responder count (no names)
+  -  View only their region
+- **Cannot:**
+  - ❌ Create dispatches
+  - ❌ Update anything
+  - ❌ Signal responding
+  - ❌ See names (only "Responder #1")
+  - ❌ See audit logs
+
+**Note:** This role is **optional for MVP**. Can be added in Sprint 1+.
+
+---
+
+**4. Unauthenticated (Public)**
+- **Purpose:** First-time users, observers without account
+- **Can:**
+  -  View active dispatch list (if region allows public viewing)
+  -  View dispatch details (if region allows public viewing)
+  -  See responder count (no names)
+  -  See urgency and status
+- **Cannot:**
+  - ❌ Create dispatches
+  - ❌ Update anything
+  - ❌ See names
+  - ❌ See full descriptions
+  - ❌ See location (to protect responders)
+  - ❌ Access management features
+
+**PII Redaction for Unauthenticated:**
+```
+❌ Don't show:  name, email, phone, full description, location
+✓ Do show:    urgency, status, responder count, timestamp
+```
+
+---
+
+## Permission Model
+
+### Resource-Level Permissions
+
+**Dispatch Records:**
+
+| Action | Responder | Admin | Viewer | Public |
+|--------|-----------|-------|--------|--------|
+| Create |  YES |  YES | ❌ NO | ❌ NO |
+| View (own region) |  YES |  YES |  YES |  YES* |
+| View location |  YES |  YES |  YES | ❌ NO |
+| Update location |  YES (any) |  YES (any) | ❌ NO | ❌ NO |
+| Update urgency |  YES (any) |  YES (any) | ❌ NO | ❌ NO |
+| Close |  YES (any) |  YES (any) | ❌ NO | ❌ NO |
+| Reopen (< 15 min) |  YES (any) |  YES (any) | ❌ NO | ❌ NO |
+| Force-close (> 15 min) | ❌ NO |  YES (any) | ❌ NO | ❌ NO |
+| Delete (hard) | ❌ NO | ❌ NO | ❌ NO | ❌ NO |
+| View audit log | ❌ NO |  YES | ❌ NO | ❌ NO |
+
+\* Public viewing subject to region config: `region.allow_public_viewing = true`
+
+**Responder Entries (who's responding):**
+
+| Action | Responder | Admin | Viewer | Public |
+|--------|-----------|-------|--------|--------|
+| Add self |  YES |  YES | ❌ NO | ❌ NO |
+| Update own status |  YES |  YES | ❌ NO | ❌ NO |
+| Update others' status | ❌ NO* |  YES | ❌ NO | ❌ NO |
+| Remove responder | ❌ NO |  YES | ❌ NO | ❌ NO |
+
+\* Responders can only update their own status (claimed_at is immutable)
+
+**Users (management):**
+
+| Action | Responder | Admin | Viewer | Public |
+|--------|-----------|-------|--------|--------|
+| View user list | ❌ NO |  YES | ❌ NO | ❌ NO |
+| Create user | ❌ NO |  YES (own region) | ❌ NO | ❌ NO |
+| Edit user | ❌ NO |  YES (own region) | ❌ NO | ❌ NO |
+| Deactivate user | ❌ NO |  YES (own region) | ❌ NO | ❌ NO |
+| View audit logs | ❌ NO |  YES (own region) | ❌ NO | ❌ NO |
+
+**System Settings (admin only):**
+
+| Action | Responder | Admin | Viewer | Public |
+|--------|-----------|-------|--------|--------|
+| Configure escalation rules | ❌ NO |  YES | ❌ NO | ❌ NO |
+| Configure notifications | ❌ NO |  YES | ❌ NO | ❌ NO |
+| Trigger lockdown mode | ❌ NO |  YES | ❌ NO | ❌ NO |
+| View system health | ❌ NO |  YES | ❌ NO | ❌ NO |
+
+---
+
+## Session Lifecycle
+
+### Login Flow
+
+```
+User enters email + password
+         ↓
+POST /auth/login
+         ↓
+Backend:
+  1. Look up user by email
+  2. Compare password with bcrypt hash
+  3. Generate JWT token (1 hour expiry)
+  4. Create audit log entry
+         ↓
+Response 200 OK:
+  - Return user object (id, email, role, regions)
+  - Set HttpOnly cookie with JWT
+  - Set CORS headers
+         ↓
+Client:
+  - Store cookie (automatic, HttpOnly)
+  - Store user object in state
+  - Redirect to dispatch list
+```
+
+**Failure Cases:**
+
+| Scenario | Response | Status | Notes |
+|----------|----------|--------|-------|
+| Email not found | `{"error": "Invalid credentials"}` | 401 | Don't reveal which field |
+| Wrong password | `{"error": "Invalid credentials"}` | 401 | Don't reveal which field |
+| User deactivated | `{"error": "Account disabled"}` | 403 | Explicit message |
+| Region not allowed | `{"error": "Not authorized for region"}` | 403 | User can't access region |
+
+---
+
+### Token Refresh Flow
+
+**Client-Initiated (Proactive):**
+
+```
+Every 15 minutes (optional):
+GET /auth/session
+  Authorization: Bearer <token>
+         ↓
+Backend:
+  1. Validate current token
+  2. If expiring within 5 minutes, generate new token
+  3. Return new token (if generated)
+         ↓
+Response 200 OK:
+  - Return user object
+  - Set new HttpOnly cookie (if token refreshed)
+  - Or return 401 if token expired
+         ↓
+Client:
+  - If new token in response, update cookie
+  - If 401, redirect to login
+```
+
+**Server-Initiated (Passive):**
+
+```
+On any API request with token near expiry:
+  Backend detects token_expiry_time - now < 5_minutes
+         ↓
+In response headers:
+  Set-Cookie: <new_token>
+         ↓
+Client:
+  - Cookie updated automatically (HttpOnly)
+```
+
+---
+
+### Logout Flow
+
+```
+User clicks "Logout"
+         ↓
+POST /auth/logout
+  Authorization: Bearer <token>
+         ↓
+Backend:
+  1. Create audit log entry (logout event)
+  2. Optionally revoke token in deny-list (post-MVP)
+         ↓
+Response 204 No Content:
+  - Clear HttpOnly cookie (Max-Age=0)
+         ↓
+Client:
+  - Redirect to login page
+  - Clear local state
+```
+
+---
+
+### Session Expiry Handling
+
+**Scenario: Token expires mid-session**
+
+```
+User makes request with expired token
+         ↓
+Backend:
+  1. Validate JWT signature (fails, invalid_claims)
+  2. Return 401 Unauthorized
+         ↓
+Response 401:
+  - Error message: "Session expired. Please log in again."
+  - No new cookie set
+         ↓
+Client:
+  - Catch 401 in API interceptor
+  - Clear stored user state
+  - Redirect to login page
+  - Show: "Your session expired. Please log in."
+```
+
+---
+
+### Stale Session Handling
+
+**Scenario: App left open overnight, token expires**
+
+```
+User returns to app
+         ↓
+App calls GET /dispatches with expired token
+         ↓
+401 response caught
+         ↓
+Client:
+  1. Detect 401
+  2. Clear state
+  3. Redirect to login
+  4. Show: "Session expired. Please log in again."
+```
+
+---
+
+## Multi-Region User Isolation
+
+### Region Scoping
+
+**Database Design:**
+
+```sql
+-- In users table:
+allowed_regions JSON NOT NULL
+  -- Example: ["us-east-1", "us-west-2"]
+
+-- In dispatches table:
+region_id VARCHAR(32) NOT NULL
+  -- Every dispatch assigned to one region
+```
+
+**Authorization Rules:**
+
+1. **User can ONLY access their allowed regions**
+   ```
+   allowed_regions = ["us-east-1"]
+   
+   GET /dispatches?region=us-east-1   ALLOWED
+   GET /dispatches?region=us-west-2  ❌ FORBIDDEN (403)
+   ```
+
+2. **Implicit region filtering (if user has single region)**
+   ```
+   allowed_regions = ["us-east-1"]
+   
+   GET /dispatches   ALLOWED
+   (backend automatically filters to us-east-1)
+   ```
+
+3. **Multi-region users must specify region**
+   ```
+   allowed_regions = ["us-east-1", "us-west-2"]
+   
+   GET /dispatches                       ❌ REQUIRED: specify region
+   GET /dispatches?region=us-east-1       ALLOWED
+   GET /dispatches?region=us-west-2       ALLOWED
+   ```
+
+4. **No cross-region data leakage**
+   ```
+   Admin in us-east-1 cannot see:
+   - Dispatches in us-west-2
+   - Users assigned to us-west-2
+   - Audit logs from us-west-2
+   ```
+
+### Region Configuration
+
+**Per-Region Settings:**
+
+```json
+{
+  "region_id": "us-east-1",
+  "name": "East Coast",
+  "allow_public_viewing": true,
+  "allow_unauthenticated_viewing": true,
+  "escalation_threshold_minutes": 10,
+  "emergency_contact": "911",
+  "timezone": "America/New_York",
+  "languages": ["en"]
+}
+```
+
+**Admin-Scoped Actions:**
+
+```
+Admin in us-east-1:
+  - Can create users for us-east-1 only
+  - Can view audit logs for us-east-1 only
+  - Can configure us-east-1 settings only
+  - Cannot see users in us-west-2
+
+Admin across multiple regions:
+  - allowed_regions = ["us-east-1", "us-west-2"]
+  - Can manage users in EITHER region
+  - Must specify region when taking actions
+```
+
+---
+
+## API Authorization Examples
+
+### Example 1: Create Dispatch (Authenticated)
+
+**Request:**
+```bash
+POST /dispatches
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Content-Type: application/json
+
+{
+  "client_id": "xyz789",
+  "location": {"latitude": 40.7128, "longitude": -74.0060},
+  "description": "Person needs help",
+  "urgency": "normal"
+}
+```
+
+**Backend Logic:**
+```
+1. Validate JWT token (signature, expiry)
+   ❌ If invalid: return 401
+   
+2. Extract user from token:
+   - user_id = "usr_abc123"
+   - role = "responder"
+   - allowed_regions = ["us-east-1"]
+   
+3. Check permission:
+   - Responder role can create dispatches?  YES
+   
+4. Check region:
+   - Dispatch should go to user's region
+   - If no region specified, use first allowed region
+   - If region not in allowed_regions: ❌ return 403
+   
+5. Create dispatch:
+   - submitter_id = user_id
+   - region_id = user's region
+   - created_at = now
+   - audit_log entry: "dispatch_created by usr_abc123"
+   
+6. Return 201 Created
+```
+
+**Response 201:**
+```json
+{
+  "dispatch_id": "dsp_abc123",
+  "status": "open",
+  "submitter_id": "usr_abc123",
+  "region_id": "us-east-1",
+  "created_at": "2026-01-17T14:32:00Z"
+}
+```
+
+---
+
+### Example 2: View Dispatch (Unauthenticated)
+
+**Request:**
+```bash
+GET /dispatches?region=us-east-1
+
+(No Authorization header)
+```
+
+**Backend Logic:**
+```
+1. Check authentication:
+   - No token provided
+   - Is user authenticated? ❌ NO
+   
+2. Check region public viewing:
+   - region.allow_unauthenticated_viewing?  YES
+   
+3. Fetch dispatches for region:
+   - WHERE region_id = 'us-east-1' AND status IN (...)
+   
+4. Apply PII redaction:
+   - submitter_name → "Anonymous responder"
+   - responder names → [redacted]
+   - descriptions → kept (public safety info)
+   
+5. Return 200 OK
+```
+
+**Response 200:**
+```json
+{
+  "dispatches": [
+    {
+      "dispatch_id": "dsp_abc123",
+      "description": "Person collapsed",
+      "urgency": "critical",
+      "status": "open",
+      "submitter_name": "Anonymous responder",
+      "responder_count": 2,
+      "created_at": "2026-01-17T14:32:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### Example 3: Update Responder Status (Admin Override)
+
+**Request:**
+```bash
+PATCH /dispatches/dsp_abc123/respond/usr_xyz789
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "status": "cleared"
+}
+```
+
+**Backend Logic:**
+```
+1. Validate JWT (admin token)
+   - user_id = "usr_admin_123"
+   - role = "admin"
+   
+2. Check permission:
+   - Can admin update responder status?  YES
+   - Can responder update others' status? ❌ NO
+   
+3. Check region:
+   - Is dispatch in admin's allowed region?  YES
+   
+4. Update responder entry:
+   - responders.status = "cleared"
+   - responders.updated_at = now
+   
+5. Create audit log:
+   - event_type = "responder_status_updated"
+   - actor_id = "usr_admin_123"
+   - before_state = {"status": "assisting"}
+   - after_state = {"status": "cleared"}
+   
+6. Return 200 OK
+```
+
+---
+
+### Example 4: List Users (Admin Only)
+
+**Request:**
+```bash
+GET /users?region=us-east-1
+Authorization: Bearer <admin_token>
+```
+
+**Backend Logic:**
+```
+1. Validate JWT (admin token)
+   - user_id = "usr_admin_123"
+   - role = "admin"
+   
+2. Check permission:
+   - Can admin view user list?  YES
+   - Can responder view user list? ❌ NO
+   
+3. Check region:
+   - Is region in admin's allowed_regions?  YES
+   
+4. Return user list:
+   - Filter by region_id
+   - Include email, role, status
+   - Exclude password_hash
+   
+5. Return 200 OK
+```
+
+---
+
+### Example 5: Denied Access (Cross-Region)
+
+**Request:**
+```bash
+GET /dispatches?region=us-west-2
+Authorization: Bearer <east_region_token>
+
+(User is in us-east-1 only)
+```
+
+**Backend Logic:**
+```
+1. Validate JWT
+   - user_id = "usr_abc123"
+   - allowed_regions = ["us-east-1"]
+   
+2. Check region:
+   - Requested region = "us-west-2"
+   - Is us-west-2 in allowed_regions? ❌ NO
+   
+3. Return 403 Forbidden
+```
+
+**Response 403:**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN_REGION",
+    "message": "You don't have access to region us-west-2",
+    "request_id": "req_xyz789"
+  }
+}
+```
+
+---
+
+## Implementation Details
+
+### Password Hashing
+
+**Algorithm:** bcrypt  
+**Cost Factor:** 12 (2^12 = 4096 rounds)  
+**Never Store:** Plain text passwords
+
+**Example (pseudo-code):**
+```python
+# On registration/password change:
+hashed_password = bcrypt.hash(user_password, cost=12)
+# Store hashed_password in database
+
+# On login:
+if bcrypt.verify(login_password, stored_hash):
+    # Password correct, generate token
+else:
+    # Password incorrect, return 401
+```
+
+### JWT Signing Key
+
+**Storage:** Environment variable or secure key store  
+**Rotation:** Annually or on suspected compromise  
+**Length:** 256 bits (32 bytes) minimum  
+**Never:** Commit to source code
+
+**Example:**
+```bash
+JWT_SECRET="f3d9c2a4e8b1f7c6a5d2e9f0b1c8d7e6"
+```
+
+### Token Validation Checklist
+
+Before accepting a token, validate:
+
+```
+ Signature is valid (using JWT_SECRET)
+ Token has not expired (iat + 3600 > now)
+ Issuer is correct (iss = "dispatch.example.com")
+ Audience is correct (aud = "dispatch-api")
+ User ID is valid (sub exists in users table)
+ User is active (is_active = true)
+ User has allowed_regions (not empty)
+❌ If any check fails: reject with 401
+```
+
+---
+
+## Error Responses
+
+### 401 Unauthorized (Invalid/Missing Auth)
+
+**When:**
+- No JWT token provided
+- Token signature invalid
+- Token expired
+- User account deleted
+
+**Response:**
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authentication required. Please log in.",
+    "request_id": "req_abc123"
+  }
+}
+
+HTTP 401 Unauthorized
+```
+
+**Client Action:**
+- Clear stored credentials
+- Redirect to login
+- Show: "Session expired. Please log in."
+
+---
+
+### 403 Forbidden (Auth Valid, But Not Allowed)
+
+**When:**
+- User role lacks permission
+- User doesn't have region access
+- Resource belongs to different region
+- User is deactivated
+
+**Response (403 - Permission Denied):**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN_PERMISSION",
+    "message": "You don't have permission to perform this action",
+    "request_id": "req_xyz789"
+  }
+}
+
+HTTP 403 Forbidden
+```
+
+**Response (403 - Region Denied):**
+```json
+{
+  "error": {
+    "code": "FORBIDDEN_REGION",
+    "message": "You don't have access to region us-west-2",
+    "request_id": "req_xyz789"
+  }
+}
+
+HTTP 403 Forbidden
+```
+
+---
+
+## Testing Checklist
+
+**Before Sprint 0 Completes:**
+
+### Authentication
+
+- [ ] POST /auth/login with valid credentials returns 200 with token
+- [ ] POST /auth/login with invalid credentials returns 401
+- [ ] POST /auth/login sets HttpOnly secure cookie
+- [ ] POST /auth/logout clears cookie (Max-Age=0)
+- [ ] GET /auth/session with valid token returns 200
+- [ ] GET /auth/session with expired token returns 401
+- [ ] GET /auth/session refreshes token if expiring soon
+
+### Authorization
+
+- [ ] Responder can create dispatch
+- [ ] Responder cannot view user list
+- [ ] Responder cannot access management mode
+- [ ] Admin can view user list
+- [ ] Admin can manage users
+- [ ] Admin cannot access other regions
+- [ ] Unauthenticated user can view dispatches (if public viewing enabled)
+- [ ] Unauthenticated user cannot create dispatch
+
+### Multi-Region
+
+- [ ] User with one region gets implicit filtering
+- [ ] User with multiple regions must specify region
+- [ ] Cross-region access returns 403
+- [ ] Audit logs filtered by region
+- [ ] User list filtered by region (admin only)
+
+### Error Handling
+
+- [ ] 401 on missing token
+- [ ] 401 on invalid signature
+- [ ] 401 on expired token
+- [ ] 403 on permission denied
+- [ ] 403 on region denied
+- [ ] All errors return standardized format
+
+### Session Lifecycle
+
+- [ ] Token expires after 1 hour
+- [ ] Refresh extends expiry
+- [ ] Logout revokes session
+- [ ] Stale session handled gracefully
+
+---
+
+## Security Checklist
+
+### Pre-Deployment
+
+- [ ] JWT_SECRET is strong (>32 bytes) and stored securely
+- [ ] bcrypt cost factor is 12+ (slow intentionally)
+- [ ] HTTPS enforced (no HTTP allowed)
+- [ ] CORS headers configured correctly
+- [ ] HttpOnly cookies cannot be accessed from JS
+- [ ] SameSite=Strict prevents CSRF attacks
+- [ ] Passwords never logged or exposed in error messages
+- [ ] Token payload doesn't contain sensitive data
+- [ ] Audit log records all auth events
+- [ ] Rate limiting on /auth/login (prevent brute force)
+
+### Rate Limiting (on /auth/login)
+
+```
+Max attempts: 5 failures per IP per 15 minutes
+After limit exceeded: 429 Too Many Requests
+Retry-After: 60 seconds (or dynamic backoff)
+```
+
+---
+
+## Post-MVP Enhancements
+
+These can be added after MVP without breaking existing auth:
+
+- **Refresh Tokens:** Separate long-lived refresh token + short-lived access token
+- **Session Management:** Backend session store for immediate revocation
+- **OAuth2:** Support for external identity providers
+- **2FA:** Two-factor authentication (TOTP)
+- **SAML:** Enterprise SSO support
+- **API Keys:** Service-to-service authentication
+- **User Audit Trail:** Detailed login history per user
+
+---
+
+## Related Documents
+
+- [Backend API Contracts](/specs/backend-api-contracts) - API endpoints that use this auth
+- [Database Schema](/specs/database-schema) - users table schema
+- [System Constitution](/constitution/system-constitution) - Design principles
+- [MVP Gaps & Blockers](/roadmap/mvp-gaps-and-blockers#3-authentication--authorization-architecture-not-defined) - B3 blocker
+
+---
+
+## Deployment Checklist
+
+- [ ] JWT_SECRET configured in production environment
+- [ ] bcrypt library installed and tested
+- [ ] HTTPS certificate valid and deployed
+- [ ] CORS headers configured
+- [ ] Rate limiting middleware installed
+- [ ] Password reset flow implemented (optional for MVP)
+- [ ] Audit logging enabled
+- [ ] Monitoring alerts for failed logins
+- [ ] On-call procedures for compromised keys
+- [ ] Key rotation schedule documented
+
+---
+
+## Owners & Contacts
+
+| Role | Team | Contact |
+|------|------|---------|
+| Auth Implementation | Backend Lead | (TBD) |
+| Security Review | Security Lead | (TBD) |
+| Database Integration | Backend/DB Lead | (TBD) |
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-01-17 | Initial MVP auth architecture (JWT + roles + multi-region) |
+
+---
+
+**Document Status:** 🟢 **READY FOR IMPLEMENTATION**  
+**Blocks:** Role-based features in Sprints 1+  
+**Depends On:** [Database Schema](/specs/database-schema) , [Backend API Contracts](/specs/backend-api-contracts) 
+
+---
+
+## Next Steps
+
+1. **Security Team:** Review auth architecture and raise concerns by 2026-01-19
+2. **Backend Team:** Implement auth endpoints at Sprint 0 kickoff
+3. **Frontend Team:** Integrate login flow with mock auth
+4. **QA Team:** Execute auth test plan (see [Testing Checklist](#testing-checklist))
+5. **DevOps Team:** Configure HTTPS, rate limiting, environment variables
+
+**Sprint 0 kickoff Go/No-Go:** This spec is production-ready. Begin implementation immediately.
