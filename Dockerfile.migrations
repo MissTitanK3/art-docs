@@ -1,0 +1,51 @@
+# Dockerfile for migrations service
+# Runs database migrations before application starts
+
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat bash
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@9.0.0
+ENV PNPM_HOME="/root/.local/share/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+# ============================================================================
+# DEPENDENCIES STAGE
+# ============================================================================
+FROM base AS deps
+WORKDIR /app
+
+# Copy monorepo files
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages packages
+
+# Install dependencies (focused on migrations)
+RUN pnpm install --frozen-lockfile --filter="@repo/migrations"
+
+# ============================================================================
+# RUNTIME STAGE
+# ============================================================================
+FROM base AS runtime
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S migrations -u 1001
+
+WORKDIR /app
+
+# Copy dependencies
+COPY --from=deps --chown=migrations:nodejs /app/node_modules ./node_modules
+COPY --from=deps --chown=migrations:nodejs /app/pnpm-lock.yaml ./
+COPY --from=deps --chown=migrations:nodejs /app/pnpm-workspace.yaml ./
+COPY --from=deps --chown=migrations:nodejs /app/package.json ./
+COPY --from=deps --chown=migrations:nodejs /app/packages ./packages
+
+# Set user
+USER migrations
+
+# Health check for DB connectivity
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
+  CMD node -e "const { Client } = require('pg'); const c = new Client(process.env.DATABASE_URL); c.connect().then(() => c.end()).catch(() => process.exit(1))"
+
+# Run migrations
+CMD ["pnpm", "db:migrate"]

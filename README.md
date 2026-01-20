@@ -1,13 +1,41 @@
-# Turborepo starter
+# Turbo Monorepo
 
-This Turborepo starter is maintained by the Turborepo core team.
+Development runs Next.js on the host and Postgres in Docker. Production images are built with Docker.
 
-## Using this example
+## Quick Start (Dev)
 
-Run the following command:
+1) Start Postgres in Docker:
 
 ```sh
-npx create-turbo@latest
+docker compose up -d
+```
+
+2) Install dependencies and start the apps on the host:
+
+```sh
+pnpm install
+pnpm dev:web
+pnpm dev:docs
+```
+
+3) Set dev database URLs in app env files:
+
+- `apps/web/.env.local`
+- `apps/docs/.env.local` (if docs needs DB access)
+
+Example:
+
+```env
+DATABASE_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+SHADOW_DATABASE_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db_shadow
+```
+
+## Docker (Production)
+
+Build and run the production stack:
+
+```sh
+docker compose -f docker-compose.prod.yml up --build
 ```
 
 ## What's inside?
@@ -62,30 +90,17 @@ pnpm exec turbo build --filter=docs
 
 ### Develop
 
-To develop all apps and packages, run the following command:
+To develop all apps, run:
 
 ```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+pnpm dev
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Or start them individually:
 
 ```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+pnpm dev:web
+pnpm dev:docs
 ```
 
 ### Remote Caching

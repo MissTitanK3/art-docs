@@ -1,0 +1,20 @@
+{
+  "pgSettings": {
+    "search_path": "public"
+  },
+  "placeholders": {
+    ":DATABASE_NAME": "!ENV",
+    ":DATABASE_OWNER": "!ENV"
+  },
+  "afterReset": [
+    "migrations/scripts/afterReset.sql"
+  ],
+  "afterAllMigrations": [
+    {
+      "_": "command",
+      "command": "npm run schema:dump"
+    }
+  ],
+  "afterCurrent": [],
+  "migrationsFolder": "./migrations"
+}

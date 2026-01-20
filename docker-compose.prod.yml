@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dispatch-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dispatch_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dispatch_password}
+      POSTGRES_DB: ${POSTGRES_DB:-dispatch_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        APP: web
+    container_name: dispatch-web
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-dispatch_user}:${POSTGRES_PASSWORD:-dispatch_password}@postgres:5432/${POSTGRES_DB:-dispatch_db}
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+
+  docs:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        APP: docs
+    container_name: dispatch-docs
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - postgres
+    ports:
+      - "3001:3000"
+
+volumes:
+  postgres_data:

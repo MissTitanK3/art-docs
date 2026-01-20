@@ -1,6 +1,6 @@
 # Region Dispatch docs
 
-This app uses [Nextra](https://nextra.site/) (app router) with the `nextra-theme-docs` theme to serve the Region Dispatch constitution, specs, and language guides. The doc structure mirrors the `region-dispatch-constitution` folder so each section stays discoverable.
+This app uses [Nextra](https://nextra.site/) (app router) with the `nextra-theme-docs` theme to serve specs and language guides. The doc structure mirrors the docs content folder so each section stays discoverable.
 
 ## Run locally
 

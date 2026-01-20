@@ -1,0 +1,71 @@
+# Docker Build Context Ignore File
+# Speeds up Docker builds by excluding unnecessary files
+
+# Version Control
+.git
+.gitignore
+.gitattributes
+
+# Dependencies
+node_modules
+pnpm-store
+.pnpm-store
+
+# Build outputs
+dist
+build
+.next
+.turbo
+out
+
+# Environment files (keep .env.docker for reference)
+.env
+.env.*.local
+.env.local
+
+# Documentation/Markdown
+*.md
+docs
+
+# Testing
+coverage
+.test-cache
+__tests__
+cypress
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.circleci
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+.Thumbs.db
+
+# Misc
+.cache
+.eslintcache
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+lerna-debug.log*
+
+# Turbo
+.turbo
+packages-turbo-cache

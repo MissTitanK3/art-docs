@@ -1,0 +1,659 @@
+---
+title: Docker Deployment Architecture
+description: Complete Docker setup for the dispatch system with PostgreSQL, migrations, and multi-app orchestration
+---
+
+# Docker Deployment Architecture
+
+Complete containerized deployment strategy for the dispatch system, enabling consistent development, testing, and production environments.
+
+## Overview
+
+The Docker setup provides:
+
+- **PostgreSQL database** with persistent volumes
+- **Database migrations** service that runs on startup
+- **Web application** (Next.js dispatch interface)
+- **Documentation application** (Next.js docs)
+- **Service networking** and health checks
+- **Multi-stage builds** for optimized images
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Docker Network                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │     Web      │  │     Docs     │  │  PostgreSQL  │     │
+│  │   (port      │  │   (port      │  │   (port      │     │
+│  │    3000)     │  │    3001)     │  │    5432)     │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│       ↑               ↑                     ↑               │
+│       └───────────────┴─────────────────────┘               │
+│              Service Discovery via DNS                      │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+Initialization Flow:
+1. PostgreSQL starts, creates database
+2. Migrations service waits for DB health check
+3. Migrations service runs pending migrations
+4. Web and Docs apps wait for DB health check
+5. Apps start and connect to database
+6. All services available on docker network
+```
+
+## Files Overview
+
+### Core Orchestration
+
+**`docker-compose.yml`** - Main service definitions
+- PostgreSQL service with health checks
+- Migrations service with startup dependencies
+- Web app service with volume mounts (for hot reload in dev)
+- Docs app service
+- Network and volume configuration
+
+**`docker-compose.prod.yml`** - Production overrides
+- Always-restart policies
+- Production environment variables
+- Optimized settings for stability
+
+### Dockerfiles
+
+**`Dockerfile`** - Multi-stage build for Next.js apps
+- Base stage: Sets up Node, pnpm, workdir
+- Dependencies stage: Installs all workspace dependencies
+- Builder stage: Builds the specified app
+- Runtime stage: Minimal production image with non-root user
+
+**`Dockerfile.migrations`** - Migrations service
+- Lightweight image focused on running migrations
+- Includes only necessary dependencies
+- Healthcheck for database connectivity
+
+### Configuration
+
+**`.env.docker`** - Docker environment defaults
+- PostgreSQL credentials and database name
+- Application ports
+- Node environment settings
+- Next.js configuration
+
+**`.dockerignore`** - Build context optimization
+- Excludes node_modules, .git, build artifacts
+- Reduces Docker build context size
+
+### Utility Scripts
+
+**`scripts/wait-for-it.sh`** - TCP service availability checker
+- Used to wait for services before starting dependents
+- Configurable timeout
+
+**`scripts/init-db.sh`** - Database initialization
+- Creates shadow database for migrations
+- Runs during PostgreSQL startup
+
+## Quick Start
+
+### Prerequisites
+
+**Option 1: Docker Desktop (Recommended for WSL 2)**
+- Install Docker Desktop for Windows
+- Enable WSL 2 backend in Docker Desktop settings
+- Enable WSL integration for your Linux distro
+
+**Option 2: Docker Engine + Docker Compose**
+- Install Docker Engine in your Linux environment
+- Install Docker Compose plugin
+
+**Verify Installation:**
+```bash
+# Check Docker
+docker --version
+
+# Check Docker Compose (V2 - recommended)
+docker compose version
+
+# Or legacy V1
+docker-compose --version
+```
+
+> **Note**: This guide uses `docker compose` (V2). If using V1, replace `docker compose` with `docker-compose`.
+
+### WSL 2 Setup
+
+If you're using WSL 2 (Windows Subsystem for Linux):
+
+1. **Install Docker Desktop** on Windows
+2. Open **Docker Desktop** → **Settings**
+3. Go to **Resources** → **WSL Integration**
+4. **Enable** the toggle for your WSL distro
+5. Click **Apply & Restart**
+
+Now Docker commands will work in WSL:
+```bash
+docker --version
+docker compose version
+```
+
+### Development Setup
+
+```bash
+cd /path/to/turbo
+
+# Copy environment template
+cp .env.docker .env.local
+
+# Start all services (V2)
+docker compose up
+
+# Or with V1
+docker-compose up
+
+# In another terminal, view logs
+docker compose logs -f
+
+# Access services
+# Web: http://localhost:3000
+# Docs: http://localhost:3001
+# PostgreSQL: localhost:5432 (use psql or admin tool)
+```
+
+### Verify Services
+
+```bash
+# Check container status
+docker compose ps
+
+# View service logs
+docker compose logs postgres
+docker compose logs migrations
+docker compose logs web
+docker compose logs docs
+
+# Execute commands in containers
+docker compose exec postgres psql -U dispatch_user -d dispatch_db
+
+# Connect to web container shell
+docker compose exec web sh
+```
+
+### Stopping Services
+
+```bash
+# Stop all services (preserves volumes)
+docker compose down
+
+# Stop and remove volumes (DESTRUCTIVE)
+docker compose down -v
+
+# Stop specific service
+docker compose stop web
+```
+
+## Environment Configuration
+
+### Docker Environment Variables
+
+Set in `.env.local` (created from `.env.docker` template):
+
+```bash
+# PostgreSQL
+POSTGRES_USER=dispatch_user              # Database user
+POSTGRES_PASSWORD=dispatch_password      # Database password
+POSTGRES_DB=dispatch_db                  # Database name
+POSTGRES_PORT=5432                       # Port inside container (5432) mapped to host
+
+# Application Ports
+WEB_PORT=3000                            # Web app port on host
+DOCS_PORT=3001                           # Docs app port on host
+
+# Node Environment
+NODE_ENV=development                     # development or production
+
+# Next.js Configuration
+NEXT_PUBLIC_APP_ENV=local                # local, staging, or production
+NEXT_PUBLIC_SITE_DOMAIN=localhost:3000   # Application domain
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4000  # API endpoint
+INTERNAL_API_BASE_URL=http://localhost:4000    # Internal API endpoint
+```
+
+### Service-to-Service Communication
+
+From within Docker network, use service names as hostnames:
+
+- PostgreSQL: `postgres:5432` (not localhost)
+- Web app: `web:3000` (internal)
+- Docs app: `docs:3000` (internal)
+
+Database URL inside containers:
+```
+postgres://dispatch_user:dispatch_password@postgres:5432/dispatch_db
+```
+
+## Service Details
+
+### PostgreSQL Service
+
+**Container Name**: `dispatch-postgres`
+**Image**: `postgres:16-alpine`
+**Port**: 5432 (configurable via `POSTGRES_PORT`)
+**Volumes**:
+- `postgres_data`: Persistent database storage
+- `./scripts/init-db.sh`: Initialization script
+
+**Features**:
+- Alpine Linux for minimal size
+- UTF-8 encoding with C locale
+- Health check every 10s (5 retries)
+- Creates shadow database for migrations
+
+### Migrations Service
+
+**Container Name**: `dispatch-migrations`
+**Depends On**: PostgreSQL (health check)
+**Command**: `pnpm db:migrate`
+
+**What It Does**:
+1. Waits for PostgreSQL to be healthy
+2. Runs committed migrations
+3. Creates/updates all tables and indexes
+4. Exits after completion (does not keep running)
+
+**Profiles**: `migrations` (optional, only runs with `--profile migrations`)
+
+To run migrations explicitly:
+```bash
+docker compose --profile migrations up migrations
+```
+
+### Web Application Service
+
+**Container Name**: `dispatch-web`
+**Image**: Built from `Dockerfile` with `APP=web`
+**Port**: 3000 (configurable via `WEB_PORT`)
+
+**Development Features**:
+- Volume mounts for hot reloading
+- Shared node_modules for efficiency
+- Health check every 30s (3 retries)
+
+**Production Features**:
+- Multi-stage build for optimization
+- Non-root user (nextjs:1001)
+- Signal handling with dumb-init
+- Always-restart policy
+
+### Documentation Application Service
+
+**Container Name**: `dispatch-docs`
+**Image**: Built from `Dockerfile` with `APP=docs`
+**Port**: 3001 (configurable via `DOCS_PORT`)
+
+**Volumes**:
+- App source code for hot reloading
+- Constitution documentation
+- Shared node_modules
+
+## Building Images
+
+### Build All Services
+
+```bash
+# Build images for all services
+docker compose build
+
+# Build specific service
+docker compose build web
+docker compose build postgres  # Note: pulls pre-built image
+
+# Build with build arguments
+docker compose build --build-arg APP=docs web
+```
+
+### Multi-Stage Build Benefits
+
+The Dockerfile uses multi-stage builds:
+
+1. **Base Stage** (node:20-alpine)
+   - Sets up Node runtime and pnpm
+   - ~150MB
+
+2. **Dependencies Stage**
+   - Installs all workspace dependencies
+   - Cached unless lockfile changes
+   - ~500MB
+
+3. **Builder Stage**
+   - Compiles Next.js app
+   - Generates optimized output
+   - Discarded in final image
+
+4. **Runtime Stage**
+   - Copies only necessary artifacts
+   - Non-root user for security
+   - Final image: ~200-300MB per app
+
+## Health Checks
+
+All services have health checks to ensure readiness:
+
+### PostgreSQL Health Check
+
+```
+Test: pg_isready -U dispatch_user -d dispatch_db
+Interval: 10s
+Timeout: 5s
+Retries: 5
+Start Period: 10s (grace period before first check)
+```
+
+### Web & Docs Health Check
+
+```
+Test: curl -f http://localhost:3000
+Interval: 30s
+Timeout: 10s
+Retries: 3
+Start Period: 40s
+```
+
+### Migrations Health Check
+
+```
+Test: pg_isready against DATABASE_URL
+Interval: 10s
+Timeout: 5s
+Retries: 5
+```
+
+## Volume Management
+
+### Data Volumes
+
+**`postgres_data`** - PostgreSQL database files
+- Persists across container restarts
+- Local driver
+- Pre-existing data restored on container restart
+
+**`web_node_modules`** - Web app dependencies cache
+- Improves build performance
+- Prevents constant reinstallation
+
+**`docs_node_modules`** - Docs app dependencies cache
+- Improves build performance
+- Prevents constant reinstallation
+
+### Mounted Directories (Development)
+
+**Web App** (for hot reloading):
+```
+./apps/web → /app/apps/web
+```
+
+**Docs App** (for hot reloading):
+```
+./apps/docs → /app/apps/docs
+```
+
+## Networking
+
+**Network Name**: `dispatch-network`
+**Driver**: Bridge (default)
+
+All services on the network can communicate:
+- PostgreSQL: `postgres:5432`
+- Web: `web:3000`
+- Docs: `docs:3000`
+- Migrations can connect to `postgres` using `postgres:5432`
+
+From host machine, use:
+- PostgreSQL: `localhost:5432`
+- Web: `localhost:3000`
+- Docs: `localhost:3001`
+
+## Production Deployment
+
+### Using Production Overrides
+
+```bash
+# Start with production settings
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Or set NODE_ENV=production in .env
+NODE_ENV=production docker compose up -d
+```
+
+**Production Changes**:
+- Always-restart policy on services
+- Production NODE_ENV
+- No hot-reload volume mounts
+- Smaller bundle sizes (Next.js optimizations)
+- Non-root user for security
+
+### Production Checklist
+
+- [ ] Set `NODE_ENV=production`
+- [ ] Set `NEXT_PUBLIC_APP_ENV=production`
+- [ ] Update `POSTGRES_PASSWORD` to strong random value
+- [ ] Use production database URLs
+- [ ] Set `NEXT_PUBLIC_SITE_DOMAIN` to actual domain
+- [ ] Configure logging and monitoring
+- [ ] Set up SSL/TLS reverse proxy (nginx)
+- [ ] Configure backup strategy for `postgres_data` volume
+- [ ] Use `docker compose -f docker-compose.prod.yml` overrides
+- [ ] Test migrations against production schema
+
+## Troubleshooting
+
+### Services Won't Start
+
+**Problem**: Container exits immediately
+```bash
+# Check logs
+docker compose logs <service>
+
+# Rebuild images
+docker compose build --no-cache
+```
+
+**Problem**: "Database connection refused"
+```bash
+# Ensure PostgreSQL is healthy
+docker compose ps postgres
+
+# Check if DB is actually listening
+docker compose exec postgres pg_isready
+
+# Wait for health check
+docker compose logs postgres | grep healthcheck
+```
+
+### Migrations Fail
+
+**Problem**: "relation does not exist"
+```bash
+# Reset database (DESTRUCTIVE)
+docker compose down -v
+docker compose up
+
+# Or run migrations manually
+docker compose --profile migrations up migrations
+```
+
+### Hot Reload Not Working
+
+**Problem**: Changes not reflected in running app
+```bash
+# Ensure volume mounts are correct
+docker compose config | grep -A 5 volumes
+
+# Restart the service
+docker compose restart web
+
+# Check if Next.js is in watch mode
+docker compose logs web | grep -i watch
+```
+
+### Port Already in Use
+
+**Problem**: "port is already allocated"
+```bash
+# Change port in .env.local
+WEB_PORT=3001
+
+# Or stop the conflicting service
+docker ps
+docker stop <container_id>
+
+# Or use -p flag to override
+docker-compose -p myapp up
+```
+
+### Slow Builds
+
+**Problem**: Docker builds take too long
+```bash
+# Check .dockerignore is optimized
+cat .dockerignore
+
+# Use layer caching effectively
+docker system prune -a  # WARNING: removes all images
+docker builder prune
+
+# Build with progress output
+docker compose build --progress=plain web
+```
+
+## Performance Optimization
+
+### Build Performance
+
+1. **Cache layers effectively**
+   - Keep dependencies layer separate
+   - Order commands by change frequency
+   - Use `.dockerignore` to reduce context
+
+2. **Use Alpine images**
+   - Smaller base images (5-10MB vs 50-100MB)
+   - Faster pulls and builds
+
+3. **Multi-stage builds**
+   - Discard build-only layers
+   - Reduce final image size
+   - Only runtime dependencies in final stage
+
+### Runtime Performance
+
+1. **Volume mounts in development only**
+   - Don't mount in production
+   - Use COPY in production Dockerfile
+
+2. **Health checks tuned**
+   - Not too aggressive (save CPU)
+   - Not too lenient (slow failure detection)
+
+3. **Resource limits (optional)**
+   ```yaml
+   web:
+     deploy:
+       resources:
+         limits:
+           cpus: '0.5'
+           memory: 512M
+         reservations:
+           cpus: '0.25'
+           memory: 256M
+   ```
+
+## Backup and Restore
+
+### Backup Database
+
+```bash
+# Backup to file
+docker compose exec postgres pg_dump -U dispatch_user dispatch_db > backup.sql
+
+# Backup volume
+docker run --rm -v dispatch-postgres-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/db-backup.tar.gz -C /data .
+```
+
+### Restore Database
+
+```bash
+# Restore from file
+cat backup.sql | docker compose exec -T postgres psql -U dispatch_user dispatch_db
+
+# Restore volume
+docker compose down -v
+docker run --rm -v dispatch-postgres-data:/data -v $(pwd):/backup \
+  alpine tar xzf /backup/db-backup.tar.gz -C /data
+docker compose up -d
+```
+
+## Related Documentation
+
+- [Database Schema](/specs/database-schema) - Schema definitions
+- [Region Scope Architecture](/specs/region-scope-architecture) - Multi-region setup
+- [Migrations Package](/turbo/packages/migrations/README.md) - Migration management
+- [Backend API Contracts](/specs/backend-api-contracts) - API endpoints
+- [System Constitution](/constitution/system-constitution) - Design principles
+
+## Deployment Examples
+
+### Local Development
+
+```bash
+docker compose up
+# Services available:
+# Web: http://localhost:3000
+# Docs: http://localhost:3001
+# DB: localhost:5432
+```
+
+### CI/CD Pipeline
+
+```bash
+# Build images
+docker compose build
+
+# Run tests (if configured)
+docker compose run tests
+
+# Push to registry
+docker compose push
+
+# Deploy
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### Kubernetes Deployment
+
+Export compose to Kubernetes:
+```bash
+kompose convert -f docker-compose.yml -o k8s/
+```
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0 | 2026-01-20 | Initial Docker setup with postgres, migrations, web, docs services |
+
+## Owners & Support
+
+| Role | Contact | Deadline |
+|------|---------|----------|
+| DevOps | TBD | TBD |
+| Backend | TBD | TBD |
+| Documentation | TBD | TBD |
+
+---
+
+**Document Status**: 🟢 **READY FOR IMPLEMENTATION**
+**Depends On**: [Database Schema](/specs/database-schema), [Migrations Package](/turbo/packages/migrations)
+**Unblocks**: Local development, staging deployment, production deployment

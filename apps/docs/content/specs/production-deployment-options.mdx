@@ -1,0 +1,158 @@
+# Production Deployment Options
+
+This project can be deployed in multiple ways. The main decision is how you host:
+
+1) The Next.js apps (`apps/web`, `apps/docs`)
+2) The Postgres database
+
+Below are recommended options with a consistent checklist so teams can pick what fits their stack.
+
+---
+
+## Common Requirements (All Options)
+
+### Build artifacts
+
+- Production builds use `Dockerfile.prod` for `web` and `docs`.
+- Apps run with `next start` on port `3000` in the container.
+
+### Environment variables
+
+Set these at deploy time (per app):
+
+- `NODE_ENV=production`
+- `DATABASE_URL` (web; docs only if it uses the DB)
+- Any `NEXT_PUBLIC_*` values used by the app
+
+### Database
+
+- Postgres 16+ recommended.
+- Run migrations from the host or CI using:
+
+```bash
+pnpm db:migrate
+```
+
+---
+
+## Option A: Vercel + Supabase (Managed)
+
+**Best for:** Fastest path, managed hosting, minimal ops.
+
+**Apps**
+
+- Deploy `apps/web` and `apps/docs` as separate Vercel projects.
+- Set root directory per app in Vercel.
+- Add environment variables in Vercel (per app).
+
+**Database**
+
+- Use Supabase Postgres.
+- Set `DATABASE_URL` from Supabase connection settings.
+- Run migrations from CI or local:
+
+```bash
+pnpm db:migrate
+```
+
+---
+
+## Option B: Docker Compose on a VM (Simple + Predictable)
+
+**Best for:** Single server, full control, low complexity.
+
+**Apps + Database**
+
+- Build and run using `docker-compose.prod.yml`.
+
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+**Notes**
+
+- Use a managed Postgres instead of the local container if you want backups.
+- Add a reverse proxy (Caddy, Nginx, or Traefik) for TLS.
+
+---
+
+## Option C: AWS ECS/Fargate + RDS (Scalable)
+
+**Best for:** AWS shops, scaling and control.
+
+**Apps**
+
+- Build images from `Dockerfile.prod` with `APP=web` and `APP=docs`.
+- Push to ECR.
+- Run as two ECS services.
+
+**Database**
+
+- Use RDS Postgres.
+- Set `DATABASE_URL` to the RDS endpoint.
+
+---
+
+## Option D: Fly.io + Managed Postgres (Edge-friendly)
+
+**Best for:** Global edge deployment, fast boot times.
+
+**Apps**
+
+- Build from `Dockerfile.prod` for each app.
+- Deploy as two Fly apps.
+
+**Database**
+
+- Use Fly Postgres or external Postgres.
+- Set `DATABASE_URL` per app.
+
+---
+
+## Option E: Render/Railway (Platform PaaS)
+
+**Best for:** Quick deploy without AWS overhead.
+
+**Apps**
+
+- Deploy two services with Dockerfile.
+- Configure `APP=web` and `APP=docs` as build args.
+
+**Database**
+
+- Use platform Postgres.
+- Set `DATABASE_URL` in service settings.
+
+---
+
+## Option F: Kubernetes (Helm + GitOps)
+
+**Best for:** Teams with K8s expertise and multi-environment needs.
+
+**Apps**
+
+- Build two images from `Dockerfile.prod`.
+- Use two deployments and services.
+- Set `DATABASE_URL` via secrets.
+
+**Database**
+
+- Use managed Postgres (RDS, Cloud SQL, or a K8s operator).
+
+---
+
+## Recommended Defaults
+
+- **Fastest:** Vercel + Supabase
+- **Most control:** Docker Compose on a VM
+- **Most scalable:** ECS/Fargate + RDS
+
+---
+
+## Verification Checklist
+
+- `web` is reachable on public URL.
+- `docs` is reachable on public URL.
+- `DATABASE_URL` is valid and reachable.
+- Migrations have run.
+- Health checks pass (HTTP 200 from app root).

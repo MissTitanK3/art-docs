@@ -1,0 +1,18 @@
+-- Initial schema migration
+-- This migration creates all core tables with RLS policies
+
+-- Extensions and types
+--!include fixtures/extensions.sql
+--!include fixtures/types/enums.sql
+
+-- Tables
+--!include fixtures/tables/users.sql
+--!include fixtures/tables/dispatches.sql
+--!include fixtures/tables/responders.sql
+--!include fixtures/tables/audit_log.sql
+
+-- Row Level Security policies
+--!include fixtures/rls/users_rls.sql
+--!include fixtures/rls/dispatches_rls.sql
+--!include fixtures/rls/responders_rls.sql
+--!include fixtures/rls/audit_log_rls.sql
