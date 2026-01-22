@@ -51,7 +51,7 @@ Without clarity on regional scope, deployment and architecture were uncertain:
 
 ### 3. Single Deployment, Multi-Region Configuration
 
- **Architecture:** Same codebase, deployed 3 times with different configs
+ **Architecture:** Same codebase, single deployment with region-aware routing
 
 ```
 ┌─────────────────────────────────────┐
@@ -66,11 +66,11 @@ us-west-1   us-west-2     us-east-1     (Post-MVP)
 ```
 
 **How it works:**
-- Deploy same container 3 times
-- Set environment variable per region: `REGION_ID=us-west-1`
+- One deployment serves multiple regions
+- Region resolved per request (subdomain or header)
 - App loads config from environment
 - All queries scoped to that region
-- Single database with `region_id` column on all tables
+- Region-isolated databases per environment
 
 ---
 
@@ -110,12 +110,11 @@ ALLOW_PUBLIC_VIEWING=true
 
 ```bash
 # 1. Set environment variables
-REGION_ID=us-south-1
+DB_AUS_URL=postgres://...
 PRIMARY_DOMAIN=dispatch.austin.org
 TIMEZONE=America/Chicago
 
-# 2. Deploy same codebase
-docker run dispatch:latest
+# 2. Deploy same codebase (platform-managed)
 
 # 3. Done - no migrations, no schema changes
 ```

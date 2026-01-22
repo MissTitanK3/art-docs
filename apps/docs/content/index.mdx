@@ -25,16 +25,9 @@ The measure of success is not how many features exist. It is how many people act
 
 ---
 
-## Development Setup (Host + Docker)
+## Development Setup
 
-Development runs Next.js on the host and Postgres in Docker. Production builds use Docker images.
-
-### Dev: Start Postgres in Docker
-
-```bash
-cd /path/to/turbo
-docker compose up -d
-```
+Development runs Next.js on the host with a locally managed Postgres instance. Production deploys to Vercel with Supabase Postgres.
 
 ### Dev: Start Next.js on the host
 
@@ -54,17 +47,16 @@ Create `.env.local` files in the app directories:
 Example:
 
 ```env
-DATABASE_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+DB_DEFAULT_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+DB_PNW_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+DB_NYC_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+DB_CA_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
 SHADOW_DATABASE_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db_shadow
 ```
 
-### Production: Build and run
+### Production: Deploy
 
-```bash
-docker compose -f docker-compose.prod.yml up --build
-```
-
-For more deployment strategies beyond Docker, see **[Production Deployment Options](/specs/production-deployment-options)**.
+See **[Vercel + Supabase Deployment](/deploy/vercel-supabase)**.
 
 ---
 
@@ -83,7 +75,7 @@ For more deployment strategies beyond Docker, see **[Production Deployment Optio
 - **[Escalation State Machine](/specs/escalation-state-machine)** - Escalation logic and load management
 - **[Urgency Model](/specs/urgency-model)** - Urgency semantics and decay behavior
 - **[Offline Guarantees](/specs/offline-guarantees)** - Offline sync behavior and guarantees
-- **[Production Deployment Options](/specs/production-deployment-options)** - Ways to deploy (Vercel, Docker, AWS, and more)
+- **[Vercel + Supabase Deployment](/deploy/vercel-supabase)** - Production deployment path
 
 ### Language Guidelines
 

@@ -7,9 +7,7 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "env": [
         "NEXT_PUBLIC_APP_ENV",
-        "NEXT_PUBLIC_SITE_DOMAIN",
-        "NEXT_PUBLIC_API_BASE_URL",
-        "INTERNAL_API_BASE_URL"
+        "NEXT_PUBLIC_SITE_DOMAIN"
       ],
       "outputs": [".next/**", "!.next/cache/**"]
     },

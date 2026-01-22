@@ -1,0 +1,75 @@
+# Component Placement Guidelines
+
+**Status:** 🟢  
+**Version:** 1.0  
+**Last Updated:** 2026-01-20  
+**Owner:** Frontend Platform Team  
+**Deadline:** N/A  
+
+---
+
+## Overview
+
+This document defines the decision criteria for placing components in an app (`turbo/apps/*`) versus the shared UI package (`turbo/packages/ui`). The goal is to keep the shared package stable and reusable while allowing product-specific UI to evolve quickly inside each app.
+
+---
+
+## Default Rule
+
+- **If a component is app-specific, keep it in that app.**
+- **If it is reusable across multiple apps without product-specific coupling, place it in `@repo/ui`.**
+
+---
+
+## Put Components in `turbo/apps/*` When
+
+- The component encodes product logic or domain workflows (dispatch flows, auth screens, admin dashboards).
+- It depends on app-specific data models, routes, or API clients.
+- It embeds UI copy or messaging that is unique to one product surface.
+- It uses app-level layout concerns (page chrome, navigation, or route guards).
+- It is experimental or likely to change quickly during product iteration.
+
+---
+
+## Put Components in `@repo/ui` When
+
+- The component is a pure presentational building block (buttons, cards, form elements, badges, typographic wrappers).
+- It has stable, narrow props that do not encode a product workflow.
+- It can ship without references to app-specific routes, API clients, or stores.
+- It is likely to be reused across at least two apps.
+- It conforms to the shared i18n policy (all visible copy comes from locales).
+
+---
+
+## Anti-Patterns to Avoid
+
+- **Leaking app logic into `@repo/ui`:** No API calls, global app state, or route-bound logic in shared UI.
+- **Over-generalizing too early:** If a component only exists in one app, keep it there until reuse is real.
+- **Inline copy in shared UI:** `@repo/ui` must use locale resources, not hardcoded strings.
+- **Deep imports:** Consumers should use declared `exports` from `@repo/ui`.
+
+---
+
+## Promotion Checklist (App -> `@repo/ui`)
+
+When promoting a component from an app into `@repo/ui`, confirm:
+
+- Props are minimal and app-agnostic.
+- Copy is localized via the shared locale system.
+- Styles are consistent with the shared design primitives.
+- The component is referenced by at least two apps (or explicitly planned).
+- The component exports cleanly through `@repo/ui` `package.json` `exports`.
+
+---
+
+## Practical Examples
+
+**App-level (keep in app):**
+- `DispatchTimeline`
+- `ResponderRosterTable`
+- `RegionSetupWizard`
+
+**Shared (`@repo/ui`):**
+- `Button`, `Card`, `Code`
+- `InlineAlert`, `Badge`, `StatusDot`
+- `DateInput`, `Select`, `TextArea`

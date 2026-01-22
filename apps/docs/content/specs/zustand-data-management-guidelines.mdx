@@ -1,0 +1,99 @@
+# Zustand Data Management Guidelines
+
+**Status:** 🟢  
+**Version:** 1.0  
+**Last Updated:** 2026-01-20  
+**Owner:** Frontend Platform Team  
+**Deadline:** N/A  
+
+---
+
+## Overview
+
+This document defines how we structure Zustand state for clarity, testability, and predictable data flow across apps. It focuses on store boundaries, data ownership, persistence, and async workflows.
+
+---
+
+## Principles
+
+- **Single source of truth:** Each domain owns its state in one store slice.
+- **App-first:** Keep state local to an app unless it is truly shared across apps.
+- **Derived, not duplicated:** Use selectors or computed values instead of copy-pasting derived data.
+- **Side effects at the edges:** Keep async I/O in explicit actions, not inside components.
+- **Explicit reset:** Provide a reset action for all stores that hold user/session data.
+
+---
+
+## Store Placement
+
+### Put Stores in `turbo/apps/*` When
+
+- The state models app-specific workflows or screens.
+- It depends on app-only APIs, routing, or feature flags.
+- It represents experimental flows still evolving quickly.
+
+### Put Stores in Shared Packages When
+
+- The state and actions can be reused across apps without product coupling.
+- The store is strictly generic (e.g., auth session basics, user preferences shell).
+- The state follows shared i18n or locale-driven constraints.
+
+**Default:** if unsure, keep the store in the app and promote later.
+
+---
+
+## Store Shape and Organization
+
+- **One store per domain:** separate concerns like `auth`, `dispatch`, `regions`, `ui`.
+- **Actions are verbs:** name mutations as actions (`setRegion`, `loadDispatches`).
+- **Keep state flat:** avoid deeply nested objects that are hard to update immutably.
+- **Use selectors:** prefer `useStore(selector)` to avoid over-rendering.
+
+---
+
+## Async Data Flow
+
+- **All async lives in actions:** e.g. `loadRegions`, `syncDispatches`.
+- **Track status:** every async action tracks `status` (`idle`, `loading`, `success`, `error`).
+- **Normalize errors:** store `error` as a serializable object `{ message, code }`.
+- **Avoid stale writes:** include request IDs or timestamps when relevant.
+
+---
+
+## Persistence
+
+- **Persist only user-safe data:** avoid caching secrets or tokens client-side.
+- **Namespace keys:** use `app:storeName` to avoid collisions.
+- **Provide versioning:** include `version` in persisted state for migrations.
+- **Opt-in only:** persistence is explicit, not the default.
+
+---
+
+## Testing Expectations
+
+- **Actions are unit testable:** use store actions without rendering components.
+- **Selectors are stable:** test selectors for derived state correctness.
+- **Reset works:** verify reset clears session-bound state.
+
+---
+
+## Anti-Patterns to Avoid
+
+- **Global junk drawer:** dumping unrelated state into a single `ui` store.
+- **Component-owned fetch logic:** components should call store actions, not fetch directly.
+- **Implicit dependencies:** avoid stores reaching into other stores without explicit action boundaries.
+- **Unbounded persistence:** do not persist large datasets or unbounded logs.
+
+---
+
+## Practical Examples
+
+**App-level stores:**
+- `dispatchFlowStore`
+- `regionSetupStore`
+- `incidentWizardStore`
+
+**Shared stores (only if reused):**
+- `authSessionStore`
+- `userPreferencesStore`
+- `localeStore`

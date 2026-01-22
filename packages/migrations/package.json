@@ -3,27 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Database migrations and region initialization for dispatch system",
+  "description": "Database migrations - deferred until post-Sprint 0",
   "scripts": {
-    "migrate": "graphile-migrate migrate",
-    "migrate:watch": "graphile-migrate watch",
-    "migrate:commit": "graphile-migrate commit",
-    "migrate:uncommit": "graphile-migrate uncommit",
-    "migrate:reset": "graphile-migrate reset --erase",
-    "migrate:status": "graphile-migrate status",
-    "region:init": "tsx src/region-init.ts",
-    "schema:dump": "sh migrations/scripts/dump-schema.sh",
-    "dev": "graphile-migrate watch"
-  },
-  "dependencies": {
-    "graphile-migrate": "^1.4.1",
-    "pg": "^8.11.3"
+    "lint": "eslint . --max-warnings 0"
   },
   "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@types/node": "^20.11.5",
-    "@types/pg": "^8.10.9",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "@types/node": "^22.15.3",
+    "typescript": "5.9.2"
   }
 }

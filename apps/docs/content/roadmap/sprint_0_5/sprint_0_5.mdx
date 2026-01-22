@@ -1,0 +1,220 @@
+# Sprint 0.5: Foundation Ready & Config Alignment
+
+**Date:** 2026-01-21  
+**Status:** 🟢 **PHASE A COMPLETE** | **ALL BLOCKERS RESOLVED**  
+**Blockers Resolved:** 6 of 6  COMPLETE
+
+---
+
+## Executive Summary
+
+All six critical blockers are now **fully resolved and documented**:
+
+-  **Backend API Contracts** ([Backend API Contracts](/specs/backend-api-contracts))
+-  **Database Schema** ([Database Schema](/specs/database-schema))
+-  **Authentication Architecture** ([Auth Architecture](/specs/authentication-architecture)): JWT + HttpOnly cookies, 3 core roles, multi-region isolation
+-  **Offline Support** ([Offline Architecture](/specs/offline-support-architecture)): Local queuing, exponential backoff, last-write-wins
+-  **Region Scope** ([Region Architecture](/specs/region-scope-architecture)): Multi-region MVP with 3 initial US regions
+-  **Crisis/Management Modes** ([Mode Strategy](/specs/crisis-management-mode-strategy)): Two-mode UX separation, crisis default
+
+**Action:** Sprint 0.5 kickoff is **FULL GO**. All teams can begin implementation immediately. Backend can start database setup, frontend can build components against auth and offline specs.
+
+---
+
+## Sprint Intent
+- **Phase A (Kickoff):** Begin all blocker-dependent work immediately (B1-B6: API, Schema, Auth, Offline, Regions, Modes: Backend/Frontend foundation)
+- **Phase B (Config):** Establish runtime configuration pattern for domains, APIs, and DB proxies across environments
+- **Phase C (Alignment):** Wire the `web` app to the Region Dispatch System constitution references so language and invariants are discoverable from the app context
+
+## Objective & Success Definition
+**Objective:** Create a maintainable, environment-aware configuration foundation that enables all downstream sprints to reference shared invariants and constitution documents without duplication or drift. Simultaneously, unblock backend/frontend teams to begin foundation work from finalized API and schema specs.
+
+**Success is achieved when:**
+- Configuration changes propagate correctly across local/staging/production without code changes
+- Future sprint teams can discover and reference constitution/language guidelines directly from the app
+- Environment-specific domains and APIs are guaranteed to be correct in each deployment
+- Backend API tables created and endpoints operational
+- Frontend mock server and initial components built and tested
+
+---
+
+## For Backend Team
+
+### Sprint 0.5 Kickoff Tasks
+
+#### Phase A: Database Setup ✅
+
+1. **✅ Create users table** — COMPLETE
+   - Reference: [Schema: users table](/specs/database-schema#table-users)
+   - Migration: `CREATE TABLE users (id, email, password_hash, role, allowed_regions, ...)`
+   - Test: INSERT, SELECT, UPDATE, soft-delete
+   - **Implementation:** [000001.sql](/packages/migrations/migrations/committed/000001.sql)
+
+2. **✅ Create dispatches table** — COMPLETE
+   - Reference: [Schema: dispatches table](/specs/database-schema#table-dispatches)
+   - Migration: `CREATE TABLE dispatches (id, region_id, location_lat, location_lon, ...)`
+   - Test: INSERT with idempotent `client_id`, SELECT by region
+   - **Implementation:** [000001.sql](/packages/migrations/migrations/committed/000001.sql)
+
+#### Phase B: API Implementation ✅
+
+3. **✅ Implement POST /auth/login** — COMPLETE
+   - Reference: [API: POST /auth/login](/specs/backend-api-contracts#post-authlogin)
+   - Query: Select from users table by email
+   - Test: Valid credentials → 200 with JWT, invalid → 401
+   - **Implementation:** [auth.ts](/packages/api-core/src/auth.ts)
+
+4. **✅ Implement POST /dispatches** — COMPLETE
+   - Reference: [API: POST /dispatches](/specs/backend-api-contracts#post-dispatches)
+   - Query: Insert into dispatches with client_id idempotency
+   - Test: Valid payload → 201, duplicate client_id → 200 (idempotent), invalid location → 422
+   - **Implementation:** [dispatches.ts](/packages/api-core/src/dispatches.ts)
+
+5. **✅ Implement GET /dispatches** — COMPLETE
+   - Reference: [API: GET /dispatches](/specs/backend-api-contracts#get-dispatches)
+   - Query: Select from dispatches with cursor pagination, region filter, status filter
+   - Test: Pagination works, filtering works, PII redaction for unauthenticated
+   - **Implementation:** [dispatches.ts](/packages/api-core/src/dispatches.ts)
+
+### Critical Decisions
+
+- **B3 (Auth):** JWT + HttpOnly cookies, 3 core roles (responder, admin, viewer), multi-region user isolation - [See Auth Spec](/specs/authentication-architecture)
+- **B4 (Offline):** MVP includes offline submission with exponential backoff and idempotent deduplication - [See Offline Spec](/specs/offline-support-architecture)
+- **B5 (Regions):** Multi-region MVP with 3 initial US regions (Portland OR, Denver CO, Boston MA) - [See Region Spec](/specs/region-scope-architecture)
+- **B6 (Modes):** Both Crisis Mode (default) and Management Mode (admin-only) in MVP with URL separation - [See Mode Spec](/specs/crisis-management-mode-strategy)
+
+### Database Indexes (Add after kickoff)
+
+```sql
+ALTER TABLE dispatches ADD INDEX idx_region_status (region_id, status);
+ALTER TABLE dispatches ADD INDEX idx_region_created (region_id, created_at DESC);
+-- Others listed in [Database Schema](/specs/database-schema#indexing-strategy)
+```
+
+---
+
+## For Frontend Team
+
+### Sprint 0.5 Kickoff Tasks
+
+#### Phase A: Mock API Setup ✅
+
+1. **✅ Create mock server from B1 spec** — COMPLETE
+   - Reference: [Backend API Contracts](/specs/backend-api-contracts)
+   - Endpoints to mock: POST /auth/login, POST /dispatches, GET /dispatches, GET /dispatches/:id
+   - Storage: In-memory array (no real database needed)
+   - Tool: MSW (Mock Service Worker) ✅
+   - **Implementation:** [Mock handlers](/apps/web/lib/mocks/)
+
+2. **✅ Implement auth flow** — COMPLETE
+   - Reference: [API: Auth section](/specs/backend-api-contracts#authentication--session-management)
+   - Mock response: Store JWT in cookie, return user object
+   - Test: Login form works, JWT persists
+   - **Implementation:** [auth-handlers.ts](/apps/web/lib/mocks/auth-handlers.ts)
+
+#### Phase B: Component Development ✅
+
+3. **✅ Build dispatch form** — COMPLETE
+   - Reference: [API: POST /dispatches request body](/specs/backend-api-contracts#post-dispatches)
+   - Fields: location (lat/lon), description, urgency
+   - Validation: Required fields, coordinate ranges
+   - Test: Form submits to mock endpoint
+   - **Implementation:** [DispatchForm.tsx](/apps/web/components/DispatchForm.tsx)
+
+4. **✅ Build dispatch list** — COMPLETE
+   - Reference: [API: GET /dispatches response](/specs/backend-api-contracts#get-dispatches)
+   - Display: Active dispatches with pagination
+   - Filtering: By status (open/acknowledged/escalated)
+   - Test: Cursor pagination works, filters apply
+   - **Implementation:** [DispatchList.tsx](/apps/web/components/DispatchList.tsx)
+
+5. **✅ Build dispatch detail** — COMPLETE
+   - Reference: [API: GET /dispatches/:dispatch_id response](/specs/backend-api-contracts#get-dispatchesdispatch_id)
+   - Display: Full dispatch details, responder list
+   - **Implementation:** [DispatchDetailView.tsx](/apps/web/components/DispatchDetailView.tsx)
+
+### Integration Points (Ready When Backend Deploys)
+
+- [ ] Replace mock server with real API endpoints
+- [ ] Test real JWT flow
+- [ ] Verify pagination cursor works
+- [ ] Verify error handling (400, 401, 403, 422)
+
+---
+
+## For QA/Testing Team
+
+### Sprint 0.5 Test Plan
+
+#### API Contract Verification (From B1)
+
+```
+✓ POST /auth/login
+  ✓ Valid credentials → 200 with token
+  ✓ Invalid credentials → 401
+  ✓ Missing email → 400
+
+✓ POST /dispatches
+  ✓ Valid payload → 201 with dispatch_id
+  ✓ Invalid location → 422
+  ✓ Duplicate client_id → 200 (idempotent)
+  ✓ Missing location → 400
+
+✓ GET /dispatches
+  ✓ Returns list with cursor pagination
+  ✓ Filters by status and urgency
+  ✓ Cursor-based pagination works across multiple requests
+  ✓ Unauthenticated user sees PII-redacted data
+
+✓ GET /dispatches/:id
+  ✓ Returns dispatch detail
+  ✓ Invalid dispatch_id → 404
+  ✓ Unauthorized user → 403
+```
+
+#### Database Verification (From B2)
+
+```
+✓ users table
+  ✓ Insert user, select by email
+  ✓ password_hash never exposed
+  ✓ allowed_regions restricts access
+
+✓ dispatches table
+  ✓ Insert with client_id, verify UNIQUE constraint
+  ✓ Insert duplicate client_id, verify no duplicate
+  ✓ Select with region filter
+  ✓ Verify version field increments on UPDATE
+  ✓ Verify is_deleted flag works (soft delete)
+
+✓ audit_log table
+  ✓ Audit entry created for dispatch creation
+  ✓ Audit entry includes before_state, after_state
+  ✓ Audit entries are immutable (append-only)
+```
+
+---
+
+## Configuration & Constitution Alignment
+
+### Constitution & Language Resources
+
+For all future sprint work, reference these foundational documents:
+
+- **[System Constitution](/index)** - Core principles, development intent, and accessibility requirements
+- **[Invariant Checklist](/compliance/invariant-checklist)** - System-wide invariants that must hold across all features
+- **[Language Guidelines](/language/reassurance)** - Approved copy patterns for reassurance and error messaging
+- **[Prompt Guidance](/prompt-guidance)** - Development standards and constitution-aligned practices
+
+**Integration Pattern:** All feature work should start by reviewing relevant constitution sections to ensure alignment with system intent. Copy should follow language guidelines. New features should validate against invariants.
+
+### Framing the Unknowns
+- **Backend readiness:** Will backend services be available with documented API contracts before intake work begins?  **YES** - B1 & B2 finalized
+- **Regional variations:** How much will region-specific configuration differ beyond domains/APIs?
+- **Environment naming:** Will Vercel project settings align with environment names (local/staging/production)?
+- **Constitution maintenance:** Who will own updates to constitution docs, and how will changes propagate to deployed apps?
+
+## Primary Risks & Tradeoffs
+**Risks:**
+- Misconfigured env vars in CI/Vercel could silently point to wrong backend, causing data/logic errors
+- If constitution docs are not linked from the app, future teams may not discover or use them

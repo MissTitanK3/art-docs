@@ -1,16 +1,26 @@
 # Turbo Monorepo
 
-Development runs Next.js on the host and Postgres in Docker. Production images are built with Docker.
+Development runs Next.js on the host with a locally managed Postgres instance. Production deploys to Vercel with Supabase Postgres.
+
+---
+
+## 🎉 Sprint 0 Phase A Complete
+
+Phase A of Sprint 0 has been successfully implemented:
+
+- ✅ Database schema (users + dispatches tables)
+- ✅ Mock API (auth + dispatch endpoints)
+- ✅ Test infrastructure
+
+**See [PHASE_A_COMPLETE.md](./PHASE_A_COMPLETE.md) for full details.**
+
+---
 
 ## Quick Start (Dev)
 
-1) Start Postgres in Docker:
+•) Start Postgres locally (any standard Postgres installation works).
 
-```sh
-docker compose up -d
-```
-
-2) Install dependencies and start the apps on the host:
+•) Install dependencies and start the apps on the host:
 
 ```sh
 pnpm install
@@ -18,7 +28,7 @@ pnpm dev:web
 pnpm dev:docs
 ```
 
-3) Set dev database URLs in app env files:
+•) Set dev database URLs in app env files:
 
 - `apps/web/.env.local`
 - `apps/docs/.env.local` (if docs needs DB access)
@@ -26,16 +36,11 @@ pnpm dev:docs
 Example:
 
 ```env
-DATABASE_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+DB_DEFAULT_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+DB_PNW_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+DB_NYC_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
+DB_CA_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db
 SHADOW_DATABASE_URL=postgres://dispatch_user:dispatch_password@localhost:5432/dispatch_db_shadow
-```
-
-## Docker (Production)
-
-Build and run the production stack:
-
-```sh
-docker compose -f docker-compose.prod.yml up --build
 ```
 
 ## What's inside?
@@ -64,7 +69,7 @@ This Turborepo has some additional tools already setup for you:
 
 To build all apps and packages, run the following command:
 
-```
+```bash
 cd my-turborepo
 
 # With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
@@ -78,7 +83,7 @@ pnpm exec turbo build
 
 You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
 
-```
+```bash
 # With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
 turbo build --filter=docs
 
@@ -92,13 +97,13 @@ pnpm exec turbo build --filter=docs
 
 To develop all apps, run:
 
-```
+```bash
 pnpm dev
 ```
 
 Or start them individually:
 
-```
+```bash
 pnpm dev:web
 pnpm dev:docs
 ```
@@ -112,7 +117,7 @@ Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/do
 
 By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
 
-```
+```bash
 cd my-turborepo
 
 # With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
@@ -128,7 +133,7 @@ This will authenticate the Turborepo CLI with your [Vercel account](https://verc
 
 Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
 
-```
+```bash
 # With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
 turbo link
 

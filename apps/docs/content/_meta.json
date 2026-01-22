@@ -15,6 +15,9 @@
   "roadmap": {
     "title": "Roadmap"
   },
+  "deploy": {
+    "title": "Deploy"
+  },
   "versions": {
     "title": "Versions"
   }

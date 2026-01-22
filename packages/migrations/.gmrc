@@ -2,12 +2,8 @@
   "pgSettings": {
     "search_path": "public"
   },
-  "placeholders": {
-    ":DATABASE_NAME": "!ENV",
-    ":DATABASE_OWNER": "!ENV"
-  },
   "afterReset": [
-    "migrations/scripts/afterReset.sql"
+    "scripts/afterReset.sql"
   ],
   "afterAllMigrations": [
     {
