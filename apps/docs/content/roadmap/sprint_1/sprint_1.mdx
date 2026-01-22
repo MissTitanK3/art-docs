@@ -117,7 +117,7 @@ Sprint 1 focuses on delivering the minimal intake form, the first critical user 
 4. **Build form container and submission flow**
    - Reference: [API: POST /dispatches](/specs/backend-api-contracts#post-dispatches)
    - Task: Create intake form page (single screen)
-   - Task: Wire to API endpoint via `runtimeConfig.NEXT_PUBLIC_API_BASE_URL`
+   - Task: Wire to API endpoint via same-origin `/api`
    - Task: Generate client_id (UUID) client-side for idempotency
    - Task: Submit with POST to `/dispatches`
    - Test: Form submission succeeds, receives dispatch_id in response

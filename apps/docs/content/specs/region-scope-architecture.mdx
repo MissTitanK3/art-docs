@@ -428,25 +428,13 @@ Test 6: Escalation respects region config
 
 ### Environment Setup
 
-```bash
-# Portal/Portland (us-west-1)
-docker run -e REGION_ID=us-west-1 \
-           -e PRIMARY_DOMAIN=dispatch.portland.org \
-           -e TIMEZONE=America/Los_Angeles \
-           dispatch:latest
+Configure region routing via subdomains and per-region database URLs in the deployment platform:
 
-# Denver (us-west-2)
-docker run -e REGION_ID=us-west-2 \
-           -e PRIMARY_DOMAIN=dispatch.denver.org \
-           -e TIMEZONE=America/Denver \
-           dispatch:latest
+- `dispatch.portland.org` → region `PNW`
+- `dispatch.denver.org` → region `DEN`
+- `dispatch.boston.org` → region `BOS`
 
-# Boston (us-east-1)
-docker run -e REGION_ID=us-east-1 \
-           -e PRIMARY_DOMAIN=dispatch.boston.org \
-           -e TIMEZONE=America/New_York \
-           dispatch:latest
-```
+Set the corresponding `DB_<REGION>_URL` environment variables.
 
 ### DNS Configuration
 
@@ -455,10 +443,7 @@ dispatch.portland.org  → api.dispatch.org (load balancer)
 dispatch.denver.org    → api.dispatch.org (load balancer)
 dispatch.boston.org    → api.dispatch.org (load balancer)
 
-Load balancer routes based on:
-  - Host header (dispatch.portland.org)
-  - Sets REGION_ID environment variable for request context
-  - Application instance processes with region scoping
+Routing uses the Host header to resolve region per request.
 ```
 
 ---
@@ -494,9 +479,6 @@ TIMEZONE=America/Chicago
 
 ```bash
 # Same codebase, different environment
-docker run -e REGION_ID=us-south-1 \
-           -e PRIMARY_DOMAIN=dispatch.austin.org \
-           dispatch:latest
 ```
 
 ### Step 4: Verify

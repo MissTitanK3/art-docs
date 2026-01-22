@@ -28,6 +28,13 @@
   },
   "region-scope-architecture": "Region Scope Architecture",
   "region-scope-summary": "Region Scope Summary",
+  "---7": {
+    "type": "separator",
+    "title": "Platform & Tooling"
+  },
+  "packages-structure": "Packages Structure & Layout",
+  "component-placement-guidelines": "Component Placement Guidelines",
+  "zustand-data-management-guidelines": "Zustand Data Management Guidelines",
   "---5": {
     "type": "separator",
     "title": "Product & UX"

@@ -1,0 +1,35 @@
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+RUN npm i -g pnpm@9
+
+FROM base AS deps
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages ./packages
+COPY apps ./apps
+COPY turbo.json ./
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS build
+ARG APP
+RUN pnpm --filter "${APP}" build
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+RUN apk add --no-cache dumb-init libc6-compat
+ENV NODE_ENV=production
+RUN npm i -g pnpm@9
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages ./packages
+COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=deps /app/package.json ./package.json
+
+ARG APP
+ENV APP=${APP}
+COPY --from=build /app/apps/${APP} ./apps/${APP}
+
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD wget -qO- http://localhost:3000/health || exit 1
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["sh", "-c", "pnpm --filter ${APP} start"]

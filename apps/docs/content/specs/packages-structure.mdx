@@ -1,0 +1,130 @@
+# Turbo Packages Structure & Layout
+
+**Status:** 🟢  
+**Version:** 1.0  
+**Last Updated:** 2026-01-20  
+**Owner:** Platform Team  
+**Deadline:** N/A  
+
+---
+
+## Overview
+
+The `turbo/packages` directory is the shared, cross-application layer of the monorepo. It contains reusable configuration, UI primitives, database migration tooling, and small runtime utilities that are consumed by apps under `turbo/apps` via workspace dependencies.
+
+This document specifies the technical layout, exports, and dependency relationships of each package so contributors can extend or consume them without guesswork.
+
+---
+
+## Directory Layout (Top-Level)
+
+```
+packages/
+├── eslint-config/                 # Shared ESLint configs
+├── migrations/                    # DB migration + region initialization tooling
+├── next-mdx-import-source-file/   # MDX component shim for Next/Nextra
+├── typescript-config/             # Shared TSConfig presets
+└── ui/                            # Shared UI components + i18n setup
+```
+
+---
+
+## Shared Conventions
+
+- **Workspace scope:** Internal packages use `@repo/*` names and are consumed via `workspace:*` dependencies.
+- **Exports-first:** Packages with runtime code expose entry points via `exports` in `package.json` instead of relying on deep imports.
+- **ESM by default:** Several packages declare `"type": "module"` (for example `eslint-config`, `migrations`, `next-mdx-import-source-file`).
+- **TypeScript presets:** Reusable `tsconfig` baselines live in `@repo/typescript-config` and are extended by apps/packages.
+- **Localization discipline:** The UI package centralizes copy in locale resources and wires up i18n as a shared facility.
+
+---
+
+## Package Inventory
+
+### `@repo/eslint-config`
+
+**Path:** `packages/eslint-config`  
+**Purpose:** Shared ESLint configurations for base, React, and Next.js stacks.
+
+**Key files:**
+- `base.js` defines the baseline config (Prettier, TypeScript, Turbo rule set, and default ignores).
+- `next.js` extends base with Next.js, React, and React Hooks configs.
+- `react-internal.js` extends base for React libraries without Next.js.
+
+**Exports:**
+- `./base` → `base.js`
+- `./next-js` → `next.js`
+- `./react-internal` → `react-internal.js`
+
+---
+
+### `@repo/typescript-config`
+
+**Path:** `packages/typescript-config`  
+**Purpose:** Centralized TypeScript compiler presets.
+
+**Key files:**
+- `base.json` is the default strict baseline (ES2022 target, `moduleResolution: NodeNext`).
+- `nextjs.json` extends base for Next.js (bundler resolution, JSX preserve, no emit).
+- `react-library.json` extends base for library builds (`jsx: react-jsx`).
+
+---
+
+### `@repo/ui`
+
+**Path:** `packages/ui`  
+**Purpose:** Shared UI components and i18n wiring for apps.
+
+**Key files:**
+- `src/*.tsx` exports component primitives (e.g., `button.tsx`, `card.tsx`, `code.tsx`).
+- `src/i18n/i18n.ts` initializes i18next and enforces namespace conventions.
+- `src/i18n/loadLocales.ts` provides the runtime resource loader.
+
+**Exports:**
+- `./*` → `./src/*.tsx`
+- `./i18n/loadLocales` → `./src/i18n/loadLocales.ts`
+
+**Dependencies:**
+- Uses `@repo/locales` for copy and React 19 for rendering.
+
+---
+
+### `@repo/migrations`
+
+**Path:** `packages/migrations`  
+**Purpose:** Database migration workflows and region initialization tooling using Graphile Migrate.
+
+**Key files:**
+- `migrations/current.sql` is the idempotent in-progress migration file.
+- `migrations/fixtures/` contains reusable SQL fragments (tables, RLS policies, types, extensions).
+- `migrations/scripts/` holds helper scripts like schema dumps.
+- `src/region-init.ts` is the region bootstrap entry point.
+
+**Scripts:**
+- `migrate`, `migrate:watch`, `migrate:commit`, `migrate:reset`, `region:init`, `schema:dump`.
+
+---
+
+### `next-mdx-import-source-file`
+
+**Path:** `packages/next-mdx-import-source-file`  
+**Purpose:** Minimal MDX component shim expected by Next.js/Nextra pipelines.
+
+**Key files:**
+- `index.js` exports `useMDXComponents` with a pass-through mapping.
+
+---
+
+## Dependency Topology
+
+- `@repo/ui` depends on `@repo/eslint-config`, `@repo/typescript-config`, and `@repo/locales` (plus React runtime deps).
+- `@repo/migrations` depends on `@repo/typescript-config` and external DB tooling (`graphile-migrate`, `pg`).
+- Config packages (`@repo/eslint-config`, `@repo/typescript-config`) are dependency roots intended to be consumed by other packages/apps.
+- `next-mdx-import-source-file` has no external dependencies and exists solely to satisfy MDX tooling requirements.
+
+---
+
+## Operational Notes
+
+- Repo-level scripts in `turbo/package.json` proxy to packages via `pnpm --filter` for DB migration workflows.
+- When adding a new shared package, follow the `@repo/*` naming convention, add explicit `exports`, and document it here.

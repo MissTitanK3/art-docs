@@ -1,397 +1,106 @@
-# Sprint 0: Foundation Ready & Config Alignment
+# Sprint 0: Dev -> Prod -> Region-Prod "Hello World"
 
-**Date:** 2026-01-17  
-**Status:** 🟢 **ALL BLOCKERS RESOLVED - FULL GO**  
-**Blockers Resolved:** 6 of 6  COMPLETE
+**Date:** 2026-01-21  
+**Status:** **PLANNED**  
+**Goal:** Prove the full deployment flow from local dev to prod to region-prod with a minimal "hello world".
 
 ---
 
 ## Executive Summary
 
-All six critical blockers are now **fully resolved and documented**:
+Sprint 0 is intentionally small. It validates the deployment pipeline and environment configuration by shipping a minimal "hello world" across:
 
--  **Backend API Contracts** ([Backend API Contracts](/specs/backend-api-contracts))
--  **Database Schema** ([Database Schema](/specs/database-schema))
--  **Authentication Architecture** ([Auth Architecture](/specs/authentication-architecture)): JWT + HttpOnly cookies, 3 core roles, multi-region isolation
--  **Offline Support** ([Offline Architecture](/specs/offline-support-architecture)): Local queuing, exponential backoff, last-write-wins
--  **Region Scope** ([Region Architecture](/specs/region-scope-architecture)): Multi-region MVP with 3 initial US regions
--  **Crisis/Management Modes** ([Mode Strategy](/specs/crisis-management-mode-strategy)): Two-mode UX separation, crisis default
+- Local development
+- Production (`www.alwaysreadytools.com`)
+- Region deployments (pnw, wap)
 
-**Action:** Sprint 0 kickoff is **FULL GO**. All teams can begin implementation immediately. Backend can start database setup, frontend can build components against auth and offline specs.
+No domain logic, no auth, no schema work. If a task is not a basic init or deployment proof, it moves to a later sprint.
 
 ---
 
 ## Sprint Intent
-- **Phase A (Kickoff):** Begin all blocker-dependent work immediately (B1-B6: API, Schema, Auth, Offline, Regions, Modes: Backend/Frontend foundation)
-- **Phase B (Config):** Establish runtime configuration pattern for domains, APIs, and DB proxies across environments
-- **Phase C (Alignment):** Wire the `web` app to the Region Dispatch System constitution references so language and invariants are discoverable from the app context
+- Prove a clean, repeatable deploy path (dev -> prod -> regions).
+- Establish environment config patterns that can be reused by all future sprints.
+- Ship the smallest possible app/API that still exercises the full pipeline.
 
 ## Objective & Success Definition
-**Objective:** Create a maintainable, environment-aware configuration foundation that enables all downstream sprints to reference shared invariants and constitution documents without duplication or drift. Simultaneously, unblock backend/frontend teams to begin foundation work from finalized API and schema specs.
+**Objective:** Establish confidence in deployment mechanics and environment wiring before any complex implementation begins.
 
 **Success is achieved when:**
-- Configuration changes propagate correctly across local/staging/production without code changes
-- Future sprint teams can discover and reference constitution/language guidelines directly from the app
-- Environment-specific domains and APIs are guaranteed to be correct in each deployment
-- Backend API tables created and endpoints operational
-- Frontend mock server and initial components built and tested
+- `apps/web` renders a "hello world" page in prod and region deployments
+- Supabase `/rest/v1` (or `/health`) is reachable in prod and region deployments
+- Runtime config resolves environment + region correctly (local/prod/pnw/wap)
+- CI/CD can deploy without manual steps
+- Each region deploy (pnw, wap) proves a distinct region value is observable in the response
 
 ---
 
-## For Backend Team
+## In Scope (Basic Inits Only)
+- Minimal web page ("hello world")
+- Supabase connectivity check (`/rest/v1` or `/health`)
+- Environment configuration (local, prod, pnw, wap)
+- CI/CD pipeline verification
+- Region-specific deployment verification (pnw, wap)
 
-### Sprint 0 Kickoff Tasks
+## Out of Scope (Moved to Later Sprints)
+- API contracts, database schema, and migrations
+- Authentication, roles, and session management
+- Offline support, queueing, or idempotency logic
+- Region scope decisions beyond proving a region-prod target exists
+- Crisis/management mode architecture
+- Intake forms, dispatch flows, and UX components
 
-#### Phase A: Database Setup
+---
 
-1. **Create users table**
-   - Reference: [Schema: users table](/specs/database-schema#table-users)
-   - Migration: `CREATE TABLE users (id, email, password_hash, role, allowed_regions, ...)`
-   - Test: INSERT, SELECT, UPDATE, soft-delete
+## For Infra/Platform Team
 
-2. **Create dispatches table**
-   - Reference: [Schema: dispatches table](/specs/database-schema#table-dispatches)
-   - Migration: `CREATE TABLE dispatches (id, region_id, location_lat, location_lon, ...)`
-   - Test: INSERT with idempotent `client_id`, SELECT by region
+### Phase A: Deployment Flow
+1. **Set up environment targets**
+   - Local, prod, pnw, wap
+   - Ensure each region has a distinct region identifier
+2. **CI/CD pipeline verification**
+   - Deploy on merge to main
+   - Verify smoke test runs for web and api
 
-#### Phase B: API Implementation
-
-3. **Implement POST /auth/login**
-   - Reference: [API: POST /auth/login](/specs/backend-api-contracts#post-authlogin)
-   - Query: Select from users table by email
-   - Test: Valid credentials → 200 with JWT, invalid → 401
-
-4. **Implement POST /dispatches**
-   - Reference: [API: POST /dispatches](/specs/backend-api-contracts#post-dispatches)
-   - Query: Insert into dispatches with client_id idempotency
-   - Test: Valid payload → 201, duplicate client_id → 200 (idempotent), invalid location → 422
-
-5. **Implement GET /dispatches**
-   - Reference: [API: GET /dispatches](/specs/backend-api-contracts#get-dispatches)
-   - Query: Select from dispatches with cursor pagination, region filter, status filter
-   - Test: Pagination works, filtering works, PII redaction for unauthenticated
-
-### Critical Decisions
-
-- **B3 (Auth):** JWT + HttpOnly cookies, 3 core roles (responder, admin, viewer), multi-region user isolation - [See Auth Spec](/specs/authentication-architecture)
-- **B4 (Offline):** MVP includes offline submission with exponential backoff and idempotent deduplication - [See Offline Spec](/specs/offline-support-architecture)
-- **B5 (Regions):** Multi-region MVP with 3 initial US regions (Portland OR, Denver CO, Boston MA) - [See Region Spec](/specs/region-scope-architecture)
-- **B6 (Modes):** Both Crisis Mode (default) and Management Mode (admin-only) in MVP with URL separation - [See Mode Spec](/specs/crisis-management-mode-strategy)
-
-### Database Indexes (Add after kickoff)
-
-```sql
-ALTER TABLE dispatches ADD INDEX idx_region_status (region_id, status);
-ALTER TABLE dispatches ADD INDEX idx_region_created (region_id, created_at DESC);
--- Others listed in [Database Schema](/specs/database-schema#indexing-strategy)
-```
+### Phase B: Runtime Configuration
+3. **Define runtime config schema**
+   - Required keys: `ENV_NAME`, `REGION_NAME`, `API_BASE_URL`
+   - Enforce defaults for local
+4. **Validate config propagation**
+   - Confirm web + api read the same environment/region values
 
 ---
 
 ## For Frontend Team
 
-### Sprint 0 Kickoff Tasks
-
-#### Phase A: Mock API Setup
-
-1. **Create mock server from B1 spec**
-   - Reference: [Backend API Contracts](/specs/backend-api-contracts)
-   - Endpoints to mock: POST /auth/login, POST /dispatches, GET /dispatches, GET /dispatches/:id
-   - Storage: In-memory array (no real database needed)
-   - Tool: MSW (Mock Service Worker) or Mirage JS
-
-2. **Implement auth flow**
-   - Reference: [API: Auth section](/specs/backend-api-contracts#authentication--session-management)
-   - Mock response: Store JWT in cookie, return user object
-   - Test: Login form works, JWT persists
-
-#### Phase B: Component Development
-
-3. **Build dispatch form**
-   - Reference: [API: POST /dispatches request body](/specs/backend-api-contracts#post-dispatches)
-   - Fields: location (lat/lon), description, urgency
-   - Validation: Required fields, coordinate ranges
-   - Test: Form submits to mock endpoint
-
-4. **Build dispatch list**
-   - Reference: [API: GET /dispatches response](/specs/backend-api-contracts#get-dispatches)
-   - Display: Active dispatches with pagination
-   - Filtering: By status (open/acknowledged/escalated)
-   - Test: Cursor pagination works, filters apply
-
-5. **Build dispatch detail**
-   - Reference: [API: GET /dispatches/:dispatch_id response](/specs/backend-api-contracts#get-dispatchesdispatch_id)
-   - Display: Full dispatch details, responder list
-
-### Integration Points (Ready When Backend Deploys)
-
-- [ ] Replace mock server with real API endpoints
-- [ ] Test real JWT flow
-- [ ] Verify pagination cursor works
-- [ ] Verify error handling (400, 401, 403, 422)
+### Phase A: Minimal Page
+1. **Create "hello world" page**
+   - Render page-level env + region value
+2. **Wire to API**
+   - Fetch Supabase endpoint and display response
+3. **Deploy to prod and regions**
+   - Confirm prod shows correct environment on page and API
+   - Confirm pnw shows correct region on page and API
+   - Confirm wap shows correct region on page and API
 
 ---
 
 ## For QA/Testing Team
 
-### Sprint 0 Test Plan
-
-#### API Contract Verification (From B1)
-
+### Smoke Test Plan
 ```
-✓ POST /auth/login
-  ✓ Valid credentials → 200 with token
-  ✓ Invalid credentials → 401
-  ✓ Missing email → 400
-
-✓ POST /dispatches
-  ✓ Valid payload → 201 with dispatch_id
-  ✓ Invalid location → 422
-  ✓ Duplicate client_id → 200 (idempotent)
-  ✓ Missing location → 400
-
-✓ GET /dispatches
-  ✓ Returns list with cursor pagination
-  ✓ Filters by status and urgency
-  ✓ Cursor-based pagination works across multiple requests
-  ✓ Unauthenticated user sees PII-redacted data
-
-✓ GET /dispatches/:id
-  ✓ Returns dispatch detail
-  ✓ Invalid dispatch_id → 404
-  ✓ Unauthorized user → 403
-```
-
-#### Database Verification (From B2)
-
-```
-✓ users table
-  ✓ Insert user, select by email
-  ✓ password_hash never exposed
-  ✓ allowed_regions restricts access
-
-✓ dispatches table
-  ✓ Insert with client_id, verify UNIQUE constraint
-  ✓ Insert duplicate client_id, verify no duplicate
-  ✓ Select with region filter
-  ✓ Verify version field increments on UPDATE
-  ✓ Verify is_deleted flag works (soft delete)
-
-✓ audit_log table
-  ✓ Audit entry created for dispatch creation
-  ✓ Audit entry includes before_state, after_state
-  ✓ Audit entries are immutable (append-only)
+✓ Web page loads in prod (shows env + region)
+✓ Web page loads in pnw region (shows env + region)
+✓ Web page loads in wap region (shows env + region)
+✓ Supabase endpoint returns 200 in prod with correct env/region
+✓ Supabase endpoint returns 200 in pnw with correct env/region
+✓ Supabase endpoint returns 200 in wap with correct env/region
+✓ CI/CD pipeline runs without manual intervention
 ```
 
 ---
 
-## Configuration & Constitution Alignment
-
-### Framing the Unknowns
-- **Backend readiness:** Will backend services be available with documented API contracts before intake work begins?  **YES** - B1 & B2 finalized
-- **Regional variations:** How much will region-specific configuration differ beyond domains/APIs?
-- **Environment naming:** Will Vercel project settings align with environment names (local/staging/production)?
-- **Constitution maintenance:** Who will own updates to constitution docs, and how will changes propagate to deployed apps?
-
-## Primary Risks & Tradeoffs
-**Risks:**
-- Misconfigured env vars in CI/Vercel could silently point to wrong backend, causing data/logic errors
-- If constitution docs are not linked from the app, future teams may not discover or use them
-- Hard-coding environment-specific logic in code later (if config is too rigid) defeats the purpose
-
-**Tradeoffs:**
-- **Simplicity vs. Flexibility:** Using `.env.local` is simple but doesn't enforce schema validation; adding validation adds complexity but prevents subtle misconfigurations
-- **Documentation vs. Code:** Keeping config examples in README is human-readable but drift-prone; automated doc generation reduces drift but requires tooling
-
-## Phased Implementation Plan
-**Phase 1 (Setup Infrastructure):**
-- Create `apps/web/config/runtime.ts` with environment-specific blocks
-- Add sample `.env.local` to `apps/web/README.md`
-- Update `turbo.json` to include env vars in build inputs
-
-**Phase 2 (Documentation & Linking):**
-- Document required env vars and their purposes
-- Add cross-links in `apps/docs/content/roadmap/` to constitution resources
-- Create Vercel environment setup guide
-
-**Phase 3 (Validation):**
-- Test locally with `.env.local` (dev environment)
-- Verify Turborepo detects env var changes
-- Confirm preview/prod env values differ correctly in Vercel
-
-## Technology Stack
-- **Language:** TypeScript (Next.js runtime config pattern)
-- **Config Source:** Environment variables (`.env.local`, Vercel project settings)
-- **Build System:** Turborepo (watches env vars for cache invalidation)
-- **Documentation:** Markdown (README, inline code comments)
-- **Related Config Files:** `turbo.json`, `apps/web/.env.local.example`, `apps/web/README.md`
-
-## Dependencies
-- Constitution documents in `apps/docs/content/index.mdx` (system constitution, invariants, language guidelines).
-- Runtime config scaffold in `apps/web/config/runtime.ts`.
-- Turborepo pipeline awareness of env vars (`turbo/turbo.json`).
-- Assumption: environment variables are managed per environment (local, preview/staging, production) via `.env.local` or Vercel project settings.
-
-## Scope and Non-Scope
-- Scope:
-  - Define required env vars and defaults for `local`, `staging`, `production`.
-  - Configure region targets (initial US regions) as part of environment/runtime config.
-  - Document how to set and override env vars for dev/preview/prod.
-  - Ensure build pipeline reads relevant env vars.
-  - Provide links from roadmap docs to constitution/language resources for downstream sprints.
-- Non-Scope:
-  - Building dispatch UI flows (covered in Sprint 1+).
-  - Implementing backend API/db provisioning.
-  - Writing copy or UI changes beyond linking to constitution resources.
-
-## Core Deliverables
-- `apps/web/config/runtime.ts` with `local`, `staging`, `production` blocks and override rules (`NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_SITE_DOMAIN`, `NEXT_PUBLIC_API_BASE_URL`, `INTERNAL_API_BASE_URL`).
-- `.env.local` example in `apps/web/README.md` showing required variables and sample values.
-- Vercel env guidance (preview→staging, production→prod) recorded in `apps/web/README.md`.
-- `turbo/turbo.json` includes the env vars in the build task inputs (`env` list).
-- Roadmap references to constitution and language docs are discoverable for future sprints (links or notes).
-
-## Success Criteria
-- Running `npm run dev` locally with `.env.local` boots the app using `local` config without missing-var errors.
-- Turborepo build detects changes when any of the four env vars change.
-- Vercel/CI instructions clearly differentiate preview vs production env values.
-- Constitution/language docs are linked from roadmap context so future sprints reuse invariants and approved copy.
-
-## Follow-On Enablement
-- Future sprints can assume environment-specific domains/APIs are set without code changes.
-- UI/feature work can reference constitution and language guidelines directly, avoiding re-definition.
-- Backend changes can adjust endpoints via env vars without refactoring the web client.
-
-## Known Gaps or Risks
-- Actual backend endpoints and domains may change; ensure env vars are updated in Vercel/CI accordingly.
-- No validation layer yet for malformed URLs—consider adding schema validation in a later sprint if needed.
-
----
-
-## Documentation Quick Links
-
-### Implementation Guides
-
-| Role | Key Document | Purpose |
-|------|--------------|---------|
-| Backend | [Backend API Contracts](/specs/backend-api-contracts) | All 14 endpoint specifications |
-| Backend | [Database Schema](/specs/database-schema) | All 5 table schemas with indexes |
-| Frontend | [Backend API Contracts](/specs/backend-api-contracts) | Mock server payload shapes |
-| QA | [Testing Checklist](/specs/database-schema#testing-checklist) | Sprint 0 test plan |
-| DevOps | [Database Schema: Deployment](/specs/database-schema#deployment-requirements) | Infrastructure setup |
-
-### Decision Tracking
-
-| Blocker | Status | Owner | Decision |
-|---------|--------|-------|----------|
-| B1: API Contracts | 🟢 | Backend Lead | [See B1 spec](/specs/backend-api-contracts) |
-| B2: Database | 🟢 | DB Lead | [See B2 spec](/specs/database-schema) |
-| B3: Auth | 🟢 RESOLVED | Security Lead | [See B3 spec](/specs/authentication-architecture) |
-| B4: Offline | 🟢 | Frontend Lead | [See B4 spec](/specs/offline-support-architecture) |
-| B5: Regions | 🟢 | Ops Lead | [See B5 spec](/specs/region-scope-architecture) |
-| B6: Modes | 🟢 | Product Lead | [See B6 spec](/specs/crisis-management-mode-strategy) |
-
----
-
-## Common Questions
-
-### Q: Can we start Sprint 0 now?
-
-**A:** YES - FULL GO for all work. All 6 blockers are resolved. Backend can start database setup, frontend can build components, QA can execute test plans, DevOps can provision infrastructure.
-
-### Q: What if we need to change the schema?
-
-**A:** Changes to core dispatch/responder tables require team alignment. Minor changes (new optional fields, new indexes) can be made during Sprint 0 stabilization. Major changes (schema restructuring) should wait until blockers B3-B6 are decided.
-
-### Q: Do we need all 5 database tables for Sprint 0?
-
-**A:** No. Minimum for kickoff: `users` + `dispatches` tables only. Add `responders` + `audit_log` in the stabilization phase. `notification_queue` is optional (can use Redis instead).
-
-### Q: Can frontend work without backend deployed?
-
-**A:** YES. Use mock server from B1 spec. No real database needed. When backend API is deployed in mid-Sprint 0, frontend switches endpoints.
-
-### Q: What about offline support?
-
-**A:**  Decided - MVP includes offline submission. Frontend can start building queue system, exponential backoff, sync UI. [See Offline Spec](/specs/offline-support-architecture).
-
-### Q: What about multi-region?
-
-**A:**  Decided - MVP launches with 3 US regions (Portland, Denver, Boston). Backend can start region_id support, frontend can build region selector. [See Region Spec](/specs/region-scope-architecture).
-
----
-
-## Go/No-Go Checklist
-
-| Item | Status | Blocker? |
-|------|--------|----------|
-| API contracts finalized |  YES | ❌ NO |
-| Database schema finalized |  YES | ❌ NO |
-| Auth architecture defined |  YES | ❌ NO |
-| Offline strategy decided |  YES | ❌ NO |
-| Region scope defined |  YES | ❌ NO |
-| Mode scope defined |  YES | ❌ NO |
-
-**Go Decision:**  **FULL GO FOR SPRINT 0** (all work, all teams)
-
-**Decision Status:**  **ALL BLOCKERS RESOLVED (6/6)**
-
----
-
-## Sprint 0 Timeline
-
-```
-Phase A
-├─ Backend: Create users + dispatches tables
-├─ Backend: Implement auth + dispatch CRUD endpoints
-├─ Frontend: Build mock server, start components
-└─ QA: Prepare test plans
-
-Phase B
-├─ Backend: Add responder signaling + notifications
-├─ Backend: Create responders + audit_log tables
-├─ Frontend: Integrate with real API
-├─ QA: Execute API contract tests
-└─ Waiting: B3, B4, B5, B6 decisions
-
-Pending
-└─ B3, B4, B5, B6: Will inform Sprint 1 & post-Sprint 0 scope
-```
-
----
-
-## Success Criteria (Sprint 0 End)
-
- **Backend Complete:**
-- [ ] All 5 database tables created and indexed
-- [ ] All 6 auth/dispatch/responder endpoints implemented
-- [ ] All endpoints return standardized error format
-- [ ] Audit log captures all mutations
-- [ ] API deployed to staging environment
-
- **Frontend Complete:**
-- [ ] Auth flow works (login, logout, session refresh)
-- [ ] Dispatch form works (submission, validation)
-- [ ] Dispatch list works (pagination, filtering)
-- [ ] All components styled and accessible
-- [ ] Integrated with real backend API
-
- **QA Complete:**
-- [ ] All API endpoints tested and verified
-- [ ] Database schema tests pass
-- [ ] Pagination and versioning tested
-- [ ] Error handling verified
-- [ ] Integration tests green
-
- **DevOps Complete:**
-- [ ] Database environment set up (staging + prod)
-- [ ] Migration pipeline working
-- [ ] CI/CD deploying backend automatically
-- [ ] Monitoring and alerting configured
-- [ ] Backup strategy in place
-
----
-
-**Next Update:** 2026-01-31 (Sprint 0 progress and stabilization check-in)
-
-**Current Status:** 🟢 **ALL BLOCKERS RESOLVED** → Sprint 0 FULL GO (all teams, all work)
+## Risks & Notes
+- If env config differs between web and api, stop and fix before moving on
+- If regions (pnw, wap) cannot be distinguished from prod, deployment is not valid
+- If region-prod cannot be distinguished from prod, deployment is not valid
