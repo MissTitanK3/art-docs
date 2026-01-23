@@ -1,0 +1,3 @@
+-- Seed script for local Supabase development
+-- This file is executed after all migrations during db reset
+-- Add your initial data here

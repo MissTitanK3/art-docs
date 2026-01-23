@@ -24,6 +24,8 @@ export const nextJsConfig = [
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Ignore static assets that may include vendor-generated JS/CSS.
+    "public/**",
   ]),
   {
     ...pluginReact.configs.flat.recommended,

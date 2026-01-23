@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ["@repo/ui"],
   // Enable subdomain support
   trailingSlash: false,
 

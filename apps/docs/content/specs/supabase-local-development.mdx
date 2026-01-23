@@ -1,0 +1,549 @@
+# Supabase Local Development
+
+Complete guide to Supabase setup and usage in the Turborepo monorepo.
+
+## Overview
+
+This monorepo uses a **vendor-agnostic database architecture**:
+
+- **Apps** → Import from `@repo/db` (abstraction layer)
+- **packages/migrations/** → Vendor-agnostic SQL documentation for communities
+- **supabase/** → Your team's local Supabase setup
+- **Production** → Can use Supabase OR raw PostgreSQL (or other providers)
+
+### Why This Architecture?
+
+✅ **For Open Source Communities**: 
+- `packages/migrations/` contains portable SQL that works with any PostgreSQL
+- No vendor lock-in - communities choose their preferred database
+- Documentation guides setup for multiple providers
+
+✅ **For Your Team**:
+- `supabase/` provides convenient local development with Supabase CLI
+- Production can use cloud Supabase OR self-hosted Postgres
+- Same app code works everywhere (environment variables control provider)
+
+✅ **For Apps**:
+- Import from `@repo/db` - one interface, any backend
+- No code changes when switching providers
+- TypeScript autocomplete works regardless of database
+
+**Status**: ✅ Setup Complete (requires Docker to start)
+
+---
+
+## Quick Start
+
+### 1. Install Docker
+
+Supabase CLI requires Docker to run local services.
+
+- **macOS/Windows**: [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- **Linux**: [Docker Engine](https://docs.docker.com/engine/install/)
+
+### 2. Start Supabase
+
+```bash
+cd ~/art/turbo
+pnpm dev:infra
+```
+
+This starts all Supabase services (PostgreSQL, Auth, Storage, Realtime, REST API, Studio).
+
+### 3. Get Credentials
+
+When you run `pnpm dev:infra`, you'll see:
+
+```
+╭──────────────────────────────────────╮
+│ 🔧 Development Tools                 │
+├─────────┬────────────────────────────┤
+│ Studio  │ http://127.0.0.1:54323     │
+│ Mailpit │ http://127.0.0.1:54324     │
+│ MCP     │ http://127.0.0.1:54321/mcp │
+╰─────────┴────────────────────────────╯
+
+╭────────────────────────────────────────────────────────────────╮
+│ 🌐 APIs                                                        │
+├──────────────┬─────────────────────────────────────────────────┤
+│ Project URL  │ http://127.0.0.1:54321                          │
+│ REST API     │ http://127.0.0.1:54321/rest/v1                  │
+│ GraphQL      │ http://127.0.0.1:54321/graphql/v1               │
+│ Edge Funcs   │ http://127.0.0.1:54321/functions/v1             │
+╰──────────────┴─────────────────────────────────────────────────╯
+
+╭────────────────────────────────────────────────────────────────╮
+│ 🗄️ Database                                                   │
+├──────────────┬─────────────────────────────────────────────────┤
+│ Database URL │ postgresql://postgres:postgres@127.0.0.1:54322/postgres │
+╰──────────────┴─────────────────────────────────────────────────╯
+
+╭────────────────────────────────────────────────────────────────╮
+│ 🔑 Authentication                                              │
+├──────────────┬─────────────────────────────────────────────────┤
+│ Publishable  │ sb_publishable_<your_key>                       │
+│ Secret       │ sb_secret_<your_key>                            │
+╰──────────────┴─────────────────────────────────────────────────╯
+
+╭────────────────────────────────────────────────────────────────╮
+│ 💾 Storage S3                                                  │
+├──────────────┬─────────────────────────────────────────────────┤
+│ Endpoint URL │ http://127.0.0.1:54321/storage/v1/s3            │
+│ Access Key   │ <your_access_key>                               │
+│ Secret Key   │ <your_secret_key>                               │
+│ Region       │ local                                           │
+╰──────────────┴─────────────────────────────────────────────────╯
+```
+
+Key services:
+- **Studio** (54323): Visual database editor and management UI
+- **Mailpit** (54324): Local email testing (catches all emails sent from your app)
+- **REST API** (54321): Main API endpoint for database queries
+- **GraphQL** (54321): GraphQL endpoint for database queries
+
+### 4. Update Environment Variables
+
+Both apps already have `.env.local` files with Supabase configuration. Update if needed with real credentials from `pnpm dev:infra` output.
+
+**apps/web/.env.local**:
+```bash
+DB_PROVIDER=supabase
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_<your_key>
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_<your_key>
+```
+
+**apps/docs/.env.local**:
+```bash
+DB_PROVIDER=supabase
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_<your_key>
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_<your_key>
+```
+
+### 5. Run Development
+
+```bash
+pnpm dev
+```
+
+Both apps now connect to the same Supabase instance.
+
+---
+
+## Architecture
+
+### Directory Structure
+
+```
+~/art/turbo/
+├── packages/db/                       # Database abstraction layer
+│   ├── src/index.ts                   # Vendor-agnostic interface
+│   └── README.md                      # Usage guide
+│
+├── packages/migrations/               # Vendor-agnostic SQL documentation
+│   ├── migrations/committed/          # Portable SQL migrations
+│   ├── fixtures/                      # Test data
+│   └── README.md                      # Community guidance
+│
+├── supabase/                          # Your team's local Supabase setup
+│   ├── config.toml                    # Supabase-specific config
+│   ├── migrations/                    # Runtime migrations (synced from packages/migrations)
+│   ├── seed.sql                       # Development seed data
+│   └── functions/                     # Edge functions (optional)
+│
+├── apps/web/
+│   └── .env.local                     # DB_PROVIDER=supabase
+│
+└── apps/docs/
+    └── .env.local                     # DB_PROVIDER=supabase
+```
+
+### Client Code Pattern
+
+Apps use the `@repo/db` abstraction layer instead of directly importing Supabase:
+
+```typescript
+// ✅ CORRECT: Use @repo/db abstraction
+import { db, dbServer, auth } from '@repo/db';
+
+// Query data
+const { data, error } = await db.from('users').select();
+
+// Insert data (server-side)
+await dbServer.from('users').insert({ email: 'user@example.com' });
+
+// Authentication
+const { data: { session } } = await auth.getSession();
+```
+
+```typescript
+// ❌ AVOID: Direct vendor imports (creates lock-in)
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(url, key);
+```
+
+**Why?**
+- Same code works with Supabase, raw PostgreSQL, or other providers
+- Switch providers by changing environment variables only
+- No code changes in apps when migrating databases
+- Community members can use any database they prefer
+
+### Region Support
+
+**Single database, region-aware via Row-Level Security (RLS):**
+
+```sql
+-- Add region column to tables
+ALTER TABLE users ADD COLUMN region_id TEXT;
+
+-- RLS policy for region isolation
+CREATE POLICY "Region isolation" ON users
+  FOR SELECT
+  USING (region_id = current_setting('app.region_id'));
+```
+
+**No multiple instances, no per-region databases.**
+
+---
+
+## Available Commands
+
+```bash
+# Start Supabase infrastructure
+pnpm dev:infra
+
+# Reset database (drop → migrate → seed)
+pnpm db:reset
+
+# Stop Supabase
+pnpm db:stop
+
+# Check status and credentials
+pnpm exec supabase status
+
+# Access Supabase Studio
+# http://127.0.0.1:54323
+
+# Run all apps
+pnpm dev
+```
+
+---
+
+## Database Migrations
+
+### Workflow
+
+1. **Create migration**:
+   ```bash
+   pnpm exec supabase migration new create_users_table
+   ```
+
+2. **Edit migration** in `supabase/migrations/<timestamp>_create_users_table.sql`:
+   ```sql
+   CREATE TABLE IF NOT EXISTS public.users (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     email TEXT UNIQUE NOT NULL,
+     region_id TEXT NOT NULL,
+     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+   );
+
+   ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+   CREATE POLICY "Users can view own data"
+     ON public.users FOR SELECT
+     USING (auth.uid() = id);
+   ```
+
+3. **Test migration**:
+   ```bash
+   pnpm db:reset
+   ```
+
+4. **Sync to documentation**:
+   ```bash
+   cp supabase/migrations/*.sql packages/migrations/migrations/committed/
+   ```
+
+5. **Document** in `packages/migrations/README.md`
+
+### Migration Strategy
+
+- **`supabase/migrations/`**: Runtime execution (Supabase CLI runs these)
+- **`packages/migrations/`**: Source of truth (documentation, testing, fixtures)
+- **Sync**: Manual copy or git pre-commit hook
+
+### Best Practices
+
+✅ Use `IF NOT EXISTS` / `IF EXISTS` (idempotent)  
+✅ Keep migrations small and focused  
+✅ Test with `pnpm db:reset` before committing  
+✅ Include RLS policies with new tables  
+✅ Document intent in `packages/migrations/README.md`  
+
+❌ No manual schema changes (always use migrations)  
+❌ No multiple Supabase instances  
+❌ No hardcoded region logic in migrations  
+
+---
+
+## Common Tasks
+
+### View Database Schema
+
+```bash
+pnpm exec supabase db dump --schema=public > schema.sql
+```
+
+### Access Database Directly
+
+```bash
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres
+```
+
+### Reset Everything
+
+```bash
+pnpm exec supabase stop --no-backup
+pnpm dev:infra
+```
+
+### Validate Setup
+
+```bash
+bash scripts/validate-supabase.sh
+```
+
+---
+
+## Troubleshooting
+
+### Docker Not Running
+
+```
+Error: Cannot connect to the Docker daemon
+```
+
+**Solution**: Start Docker Desktop or Docker Engine and retry.
+
+### Port Already in Use
+
+If ports `54320-54324` are occupied, edit `supabase/config.toml`:
+
+```toml
+[db]
+port = 54322
+
+[api]
+port = 54321
+
+[studio]
+port = 54323
+```
+
+Then restart:
+```bash
+pnpm exec supabase stop
+pnpm dev:infra
+```
+
+### Wrong Supabase URL
+
+If you get "Invalid supabaseUrl" error, ensure `.env.local` has the **Project URL** (not Database URL):
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+```
+
+**Not** the database URL (`postgresql://...`).
+
+### Missing Credentials
+
+Run `pnpm dev:infra` and copy the **Publishable** and **Secret** keys to your `.env.local` files:
+
+```bash
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_<your_key>
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_<your_key>
+```
+
+### Connection Failed
+
+Ensure Supabase is running:
+```bash
+pnpm exec supabase status
+```
+
+If not running:
+```bash
+pnpm dev:infra
+```
+
+---
+
+## Production Deployment
+
+This setup supports **multiple deployment options** with the same codebase:
+
+### Option 1: Cloud Supabase (Managed)
+
+1. **Create Supabase project** at [supabase.com](https://supabase.com)
+2. **Set environment variables**:
+   ```bash
+   DB_PROVIDER=supabase
+   NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<project_anon_key>
+   SUPABASE_SERVICE_ROLE_KEY=<project_service_key>
+   ```
+3. **Deploy apps** (no code changes)
+4. **Run migrations** via Supabase Dashboard or CLI
+
+### Option 2: Self-Hosted PostgreSQL
+
+1. **Deploy PostgreSQL** (AWS RDS, Neon, Railway, etc.)
+2. **Set environment variables**:
+   ```bash
+   DB_PROVIDER=postgres
+   DATABASE_URL=postgresql://user:password@host:5432/dbname
+   ```
+3. **Deploy apps** (no code changes)
+4. **Run migrations** from `packages/migrations/`
+
+**Note**: PostgreSQL provider is currently TODO in `@repo/db`. For now, use Supabase.
+
+### Option 3: Community Self-Hosting
+
+Community members can:
+1. Use `packages/migrations/` SQL files (vendor-agnostic)
+2. Set up any PostgreSQL-compatible database
+3. Configure `DB_PROVIDER` and connection credentials
+4. Same app code works without modification
+
+---
+
+## Security Notes
+
+- ✅ `.env.local` files in `.gitignore` (not committed)
+- ✅ Service role key is environment variable only (never hardcoded)
+- ✅ Same code everywhere (no environment branching)
+- ✅ RLS policies enforce data isolation
+- ⚠️ Local development keys are for development only
+- ⚠️ Never expose `SUPABASE_SERVICE_ROLE_KEY` in client code
+
+---
+
+## Non-Goals (Explicitly Avoided)
+
+| Non-Goal | Reason |
+|----------|--------|
+| ❌ Docker Compose for Supabase | Use `pnpm dev:infra` instead |
+| ❌ Cloud Supabase for local dev | Local only |
+| ❌ Multiple Supabase instances | One shared instance |
+| ❌ Per-app databases | All apps share same DB |
+| ❌ Per-region Supabase instances | Use RLS + `region_id` |
+| ❌ Environment-based code branching | Same code everywhere |
+
+---
+
+## Implementation Details
+
+### What Was Set Up
+
+✅ **Supabase CLI** installed (v2.72.8) as workspace devDependency  
+✅ **Single project** at `supabase/` (monorepo root)  
+✅ **Environment variables** configured in both apps  
+✅ **Client code** in `apps/web/lib/supabase-client.ts` and `apps/docs/lib/supabase-client.ts`  
+✅ **Migration strategy** documented (supabase/migrations/ ↔ packages/migrations/)  
+✅ **NPM scripts** added (`dev:infra`, `db:reset`, `db:stop`)  
+✅ **Validation script** at `scripts/validate-supabase.sh`  
+✅ **Documentation** complete  
+
+### Files Created
+
+```
+packages/db/                          # New: Database abstraction layer
+├── src/index.ts
+├── package.json
+└── README.md
+
+supabase/
+├── config.toml
+├── migrations/
+├── seed.sql
+└── functions/
+
+apps/web/
+└── .env.local (updated with DB_PROVIDER)
+
+apps/docs/
+├── .env.local (updated with DB_PROVIDER)
+└── .env.local.example
+
+scripts/
+└── validate-supabase.sh
+```
+
+### Dependencies Added
+
+- `@repo/db` (new shared package)
+- `@supabase/supabase-js` (in `@repo/db` only, not in apps)
+- Apps import from `@repo/db` (abstraction layer)
+
+### Environment Variables Required
+
+| Variable | Scope | Purpose |
+|----------|-------|---------|
+| `DB_PROVIDER` | All | Database provider (`supabase` or `postgres`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Client | Supabase API URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client | Supabase public anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server | Supabase admin key (server-side only) |
+| `DATABASE_URL` | Server | PostgreSQL connection string (when `DB_PROVIDER=postgres`) |
+
+---
+
+## Validation Checklist
+
+Run anytime:
+```bash
+bash scripts/validate-supabase.sh
+```
+
+Expected output:
+```
+✓ supabase/ exists
+✓ supabase/config.toml exists
+✓ supabase/migrations/ exists
+✓ Supabase CLI installed
+✓ @supabase/supabase-js in apps/web
+✓ @supabase/supabase-js in apps/docs
+✓ apps/web/.env.local exists
+✓ apps/docs/.env.local exists
+✓ Client files exist
+✓ NPM scripts configured
+```
+
+---
+
+## Next Steps
+
+1. **Install Docker** (if not installed)
+2. **Start Supabase**: `pnpm dev:infra`
+3. **Create migrations**: `pnpm exec supabase migration new <name>`
+4. **Add RLS policies** for auth and region isolation
+5. **Seed data** in `supabase/seed.sql`
+6. **Start building** 🚀
+
+---
+
+## Reference Links
+
+- **[@repo/db README](../../../packages/db/README.md)** - Database abstraction layer usage
+- **[packages/migrations README](../../../packages/migrations/README.md)** - Vendor-agnostic migrations
+- [Supabase Local Development Docs](https://supabase.com/docs/guides/local-development)
+- [Supabase CLI Reference](https://supabase.com/docs/reference/cli)
+- [Row Level Security Guide](https://supabase.com/docs/guides/auth/row-level-security)
+- [Migrations Best Practices](https://supabase.com/docs/guides/local-development/migrations)
+
+---
+
+**Questions?** Run `bash scripts/validate-supabase.sh` to verify setup or check Supabase status with `pnpm exec supabase status`.

@@ -1,3 +1,3 @@
-declare module 'nextra-theme-docs/dist/types.generated' {
-  export type LayoutProps = any;
+declare module "nextra-theme-docs/dist/types.generated" {
+  export type LayoutProps = unknown;
 }
