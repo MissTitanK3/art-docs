@@ -1,0 +1,247 @@
+# Database Migrations Strategy
+
+## Overview
+
+This document describes how database migrations are managed in the Turborepo monorepo.
+
+## Single Source of Truth
+
+- **Documentation/Intent**: `packages/migrations/`
+- **Execution Source**: `supabase/migrations/`
+
+Both directories should contain the same migration files, but serve different purposes.
+
+## Directory Structure
+
+```bash
+packages/migrations/        # Source of truth (documentation & testing)
+├── migrations/
+│   ├── committed/         # Finalized migrations (read-only)
+│   ├── fixtures/          # Test data fixtures
+│   ├── schema-dumps/      # Snapshots of schema after migrations
+│   └── scripts/           # Utility scripts for testing migrations
+├── src/                   # Migration logic (if using TypeScript)
+└── README.md
+
+supabase/                   # Runtime execution
+├── migrations/            # Active migrations for supabase start/reset
+└── config.toml
+```
+
+## Migration Workflow
+
+### 1. Create a New Migration
+
+```bash
+# This creates a timestamped file in supabase/migrations/
+pnpm exec supabase migration new create_users_table
+```
+
+### 2. Write SQL
+
+Edit the generated file in `supabase/migrations/` with your schema changes:
+
+```sql
+-- Create users table
+CREATE TABLE IF NOT EXISTS public.users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Enable Row Level Security
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policy for user access
+CREATE POLICY "Users can view own data"
+  ON public.users
+  FOR SELECT
+  USING (auth.uid() = id);
+```
+
+### 3. Test Migration Locally
+
+```bash
+# Reset the database with new migration
+pnpm db:reset
+
+# Verify schema
+pnpm exec supabase db dump --schema=public > schema.sql
+```
+
+### 4. Sync to packages/migrations/
+
+Copy the finalized migration to `packages/migrations/migrations/committed/`:
+
+```bash
+cp supabase/migrations/[timestamp]_create_users_table.sql \
+   packages/migrations/migrations/committed/
+```
+
+Or use a git pre-commit hook (recommended):
+
+```bash
+# In .git/hooks/pre-commit
+#!/bin/bash
+cp supabase/migrations/*.sql packages/migrations/migrations/committed/
+git add packages/migrations/migrations/committed/
+```
+
+### 5. Document Migration
+
+Add entry to `packages/migrations/README.md`:
+
+```markdown
+## Migration: Create Users Table
+
+**File**: `committed/20260123_create_users_table.sql`
+**Date**: 2026-01-23
+**Purpose**: Create users table with RLS policies
+
+### Schema Changes
+
+- `users` table: id (UUID PK), email (TEXT unique), created_at (TIMESTAMP)
+- RLS enabled
+- RLS policy: users can view only their own data
+```
+
+## Sync Strategy
+
+### Option A: Manual (Simple)
+
+Copy files after testing:
+
+```bash
+cp supabase/migrations/*.sql packages/migrations/migrations/committed/
+```
+
+### Option B: Git Hook (Recommended)
+
+Create `.git/hooks/pre-commit`:
+
+```bash
+#!/bin/bash
+set -e
+
+# Copy any new migrations from supabase to packages
+mkdir -p packages/migrations/migrations/committed
+cp supabase/migrations/*.sql packages/migrations/migrations/committed/ 2>/dev/null || true
+
+# Stage the committed migrations
+git add packages/migrations/migrations/committed/
+```
+
+Make it executable:
+
+```bash
+chmod +x .git/hooks/pre-commit
+```
+
+### Option C: CI Pipeline
+
+Add to your CI/CD (GitHub Actions, GitLab CI, etc.):
+
+```yaml
+- name: Sync migrations
+  run: |
+    cp supabase/migrations/*.sql packages/migrations/migrations/committed/
+    git add packages/migrations/migrations/committed/
+```
+
+## Reset Database (Development Only)
+
+```bash
+# Full reset: drop all, reapply migrations, reseed
+pnpm db:reset
+
+# Then restart Supabase to get new credentials
+pnpm dev:infra
+```
+
+## Backup Before Major Changes
+
+```bash
+# Dump current schema
+pnpm exec supabase db dump --schema=public > backup-$(date +%Y%m%d_%H%M%S).sql
+
+# Dump data too (risky - may contain production data)
+pnpm exec supabase db dump --schema=public --data-only > data-backup.sql
+```
+
+## Testing Migrations
+
+Use fixtures in `packages/migrations/fixtures/` to test migrations:
+
+```bash
+# Load a fixture after migration
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+  < packages/migrations/fixtures/test-users.sql
+```
+
+## Region Architecture (No Multiple Instances)
+
+Regions are handled within a **single database** using:
+
+1. **Schemas**: Separate schema per region (optional)
+
+   ```sql
+   CREATE SCHEMA region_pnw;
+   CREATE TABLE region_pnw.users (id UUID PRIMARY KEY);
+   ```
+
+2. **RLS + Column**: Most common approach
+
+   ```sql
+   ALTER TABLE users ADD COLUMN region_id TEXT;
+   CREATE POLICY "Region isolation"
+     ON users
+     FOR SELECT
+     USING (region_id = current_setting('app.region_id')::text);
+   ```
+
+3. **View-based**: Hide region logic from application
+
+   ```sql
+   CREATE VIEW user_data AS
+     SELECT * FROM users WHERE region_id = current_setting('app.region_id');
+   ```
+
+## Rollback Strategy
+
+Supabase doesn't support automatic rollback. Instead:
+
+1. Create a "down" migration that reverts changes:
+
+   ```sql
+   -- Migration: drop_users_table (if previous migration failed)
+   DROP TABLE IF EXISTS public.users CASCADE;
+   ```
+
+2. Test thoroughly before applying
+
+3. Use `pnpm db:reset` to start fresh if needed
+
+## Best Practices
+
+✅ **Do**:
+
+- Write idempotent migrations (use `IF NOT EXISTS`, `IF EXISTS`)
+- Keep migrations small and focused
+- Document schema changes in README
+- Test migrations locally before committing
+- Include RLS policies with new tables
+- Sync to `packages/migrations/` after testing
+
+❌ **Don't**:
+
+- Create multiple Supabase instances
+- Hardcode region info in migrations
+- Rely on environment-specific migration paths
+- Skip testing on reset
+- Leave uncommitted migrations in `supabase/migrations/`
+
+## References
+
+- [Supabase Migrations Docs](https://supabase.com/docs/guides/local-development/migrations)
+- [PostgreSQL Best Practices](https://www.postgresql.org/docs/)
+- [Row Level Security in Supabase](https://supabase.com/docs/guides/auth/row-level-security)

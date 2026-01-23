@@ -32,6 +32,8 @@
     "type": "separator",
     "title": "Platform & Tooling"
   },
+  "supabase-local-development": "Supabase Local Development",
+  "database-migrations-strategy": "Database Migrations Strategy",
   "packages-structure": "Packages Structure & Layout",
   "component-placement-guidelines": "Component Placement Guidelines",
   "zustand-data-management-guidelines": "Zustand Data Management Guidelines",

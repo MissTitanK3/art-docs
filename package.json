@@ -3,15 +3,27 @@
   "private": true,
   "scripts": {
     "dev": "turbo run dev --parallel",
+    "dev:web": "turbo run dev --filter=web",
+    "dev:docs": "turbo run dev --filter=docs",
     "build": "turbo run build",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "check-types": "turbo run check-types",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "dev:infra": "pnpm exec supabase start",
+    "db:reset": "pnpm exec supabase db reset",
+    "db:stop": "pnpm exec supabase stop"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@vitest/ui": "^3.2.4",
+    "jsdom": "^26.1.0",
     "prettier": "^3.7.4",
+    "supabase": "^2.72.8",
     "turbo": "^2.7.4",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {

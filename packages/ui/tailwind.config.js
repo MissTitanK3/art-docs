@@ -1,4 +1,4 @@
-const sharedConfig = require("@repo/typescript-config/base.json");
+
 
 export default {
   content: [

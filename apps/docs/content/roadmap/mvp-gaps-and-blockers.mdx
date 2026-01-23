@@ -568,21 +568,21 @@ These decisions are **showstoppers**. Without clarity, work cannot proceed confi
 
 ### 16. No Deployment/Release Sprint
 
-**Status:**  **PLANNED: Pre-launch checklist + rollback + CI/CD**
+**Status:**  **PLANNED: Pre-launch checklist + rollback strategy**
 
 **Plan:**
 - Pre-launch checklist: Environments ready, migrations plan, feature flags review, language/invariant checks green, accessibility sign-off, backup/restore verified, runbook printed.
-- Rollback strategy: Fast rollback via blue/green or versioned artifacts; DB rollback via backups + reversible migrations; clear stop-ship criteria.
-- CI/CD pipeline: Lint/tests → build → artifact versioning → staging deploy → smoke checks → manual approval → prod deploy; add observability hooks for post-deploy validation.
+- Rollback strategy: Fast rollback via versioned artifacts; DB rollback via backups + reversible migrations; clear stop-ship criteria.
+- Manual deployment process: Environment validation → staging deploy → smoke checks → manual verification → prod deploy.
 
 **Implementation Steps:**
 - Sprint 4-5: Draft pre-launch checklist; define stop-ship gates; identify staging/prod environments; set artifact versioning scheme.
-- Sprint 6: Wire CI/CD stages (lint/test/build, artifact publish, staging deploy + smoke, manual approval, prod deploy); ensure rollback script exists; document backup/restore steps.
+- Sprint 6: Document deployment stages (validate/build, staging deploy + smoke, manual verification, prod deploy); ensure rollback script exists; document backup/restore steps.
 - Sprint 7/8 (pre-launch): Run full rehearsal with checklist; validate rollback; store runbook; assign on-call for the deploy window.
 
 **Action Completed:**
 - [x] Owner assigned (DevOps/Ops Lead); deployment owner confirmed
-- [x] Checklist, rollback strategy, and CI/CD pipeline documented in [specs/deploy-runbook.md](specs/deploy-runbook.md)
+- [x] Checklist, rollback strategy, and deployment process documented in [specs/deploy-runbook.md](specs/deploy-runbook.md)
 - [x] Release versioning expectations added to [versions/changelog.md](versions/changelog.md)
 - [x] Pre-launch gate and rehearsal requirement scheduled for Sprint 7/8
 
@@ -660,7 +660,7 @@ Based on gaps analysis, **MVP should include Sprints 0-4 + targeted Sprint 6 tas
 |---|-----|-------|--------|-------------|--------|
 | 13 | WCAG audit | Design/QA Lead | Sprint 5-6 | Accessibility audit + fixes | 🟡 PLANNED |
 | 14 | Compliance automation | QA/DevOps Lead | Sprint 6 | Language/invariant CI + checklist | 🟡 PLANNED |
-| 16 | Deployment/CI-CD | DevOps/Ops Lead | Sprint 4-8 | Pre-launch checklist, rollback rehearsal, CI pipeline | 🟡 PLANNED |
+| 16 | Deployment Process | DevOps/Ops Lead | Sprint 4-8 | Pre-launch checklist, rollback rehearsal, deployment runbook | 🟡 PLANNED |
 
 ---
 
@@ -693,7 +693,7 @@ Based on gaps analysis, **MVP should include Sprints 0-4 + targeted Sprint 6 tas
 - [Pre-Deployment Invariant Checklist](/compliance/invariant-checklist) - Verification requirements
 - [Tabletop Scenarios](/compliance/tabletop-scenarios) - Real-world validation flows
 - [Locales README](/locales) - Language design rules
-- [Deploy Runbook](/specs/deploy-runbook.md) - Deployment strategy and CI/CD
+- [Deploy Runbook](/specs/deploy-runbook.md) - Deployment strategy and runbook
 
 ---
 

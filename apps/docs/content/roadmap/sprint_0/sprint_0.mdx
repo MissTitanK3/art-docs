@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Sprint 0 is intentionally small. It validates the deployment pipeline and environment configuration by shipping a minimal "hello world" across:
+Sprint 0 is intentionally small. It validates environment configuration by shipping a minimal "hello world" across:
 
 - Local development
 - Production (`www.alwaysreadytools.com`)
@@ -19,27 +19,26 @@ No domain logic, no auth, no schema work. If a task is not a basic init or deplo
 ---
 
 ## Sprint Intent
-- Prove a clean, repeatable deploy path (dev -> prod -> regions).
-- Establish environment config patterns that can be reused by all future sprints.
-- Ship the smallest possible app/API that still exercises the full pipeline.
+- Prove environment config patterns can support dev -> prod -> regions.
+- Establish runtime configuration that can be reused by all future sprints.
+- Ship the smallest possible app/API that validates environment setup.
 
 ## Objective & Success Definition
 **Objective:** Establish confidence in deployment mechanics and environment wiring before any complex implementation begins.
 
 **Success is achieved when:**
 - `apps/web` renders a "hello world" page in prod and region deployments
-- Supabase `/rest/v1` (or `/health`) is reachable in prod and region deployments
+- API `/health` endpoint is reachable and returns environment + region info
 - Runtime config resolves environment + region correctly (local/prod/pnw/wap)
-- CI/CD can deploy without manual steps
 - Each region deploy (pnw, wap) proves a distinct region value is observable in the response
 
 ---
 
 ## In Scope (Basic Inits Only)
 - Minimal web page ("hello world")
-- Supabase connectivity check (`/rest/v1` or `/health`)
+- API health endpoint (`/api/health`) with environment + region info
+- Supabase connectivity validation
 - Environment configuration (local, prod, pnw, wap)
-- CI/CD pipeline verification
 - Region-specific deployment verification (pnw, wap)
 
 ## Out of Scope (Moved to Later Sprints)
@@ -58,9 +57,9 @@ No domain logic, no auth, no schema work. If a task is not a basic init or deplo
 1. **Set up environment targets**
    - Local, prod, pnw, wap
    - Ensure each region has a distinct region identifier
-2. **CI/CD pipeline verification**
-   - Deploy on merge to main
-   - Verify smoke test runs for web and api
+2. **Create API health endpoint**
+   - `/api/health` returns environment, region, and Supabase status
+   - Endpoint accessible from all environments
 
 ### Phase B: Runtime Configuration
 3. **Define runtime config schema**
@@ -92,10 +91,10 @@ No domain logic, no auth, no schema work. If a task is not a basic init or deplo
 ✓ Web page loads in prod (shows env + region)
 ✓ Web page loads in pnw region (shows env + region)
 ✓ Web page loads in wap region (shows env + region)
-✓ Supabase endpoint returns 200 in prod with correct env/region
-✓ Supabase endpoint returns 200 in pnw with correct env/region
-✓ Supabase endpoint returns 200 in wap with correct env/region
-✓ CI/CD pipeline runs without manual intervention
+✓ /api/health endpoint returns 200 in prod with correct env/region
+✓ /api/health endpoint returns 200 in pnw with correct env/region
+✓ /api/health endpoint returns 200 in wap with correct env/region
+✓ Supabase connectivity validated via health endpoint
 ```
 
 ---
