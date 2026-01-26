@@ -1,3 +1,4 @@
+@import "./accessibility-tokens.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,8 +10,6 @@ body {
 }
 
 body {
-  color: #e0e0e0;
-  background: #3e3e3e;
   font-family: system-ui, sans-serif;
 }
 
@@ -19,8 +18,6 @@ body {
   padding: 0;
   margin: 0;
 }
-
-
 
 @layer base {
   :root {
@@ -49,6 +46,7 @@ body {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+    color-scheme: light;
   }
   .dark {
     --background: 240 10% 3.9%;
@@ -75,10 +73,9 @@ body {
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    color-scheme: dark;
   }
 }
-
-
 
 @layer base {
   * {
@@ -86,5 +83,28 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer base {
+  html {
+    font-size: calc(16px * var(--a11y-font-size-scale, 1));
+    line-height: var(--a11y-line-height, 1.5);
+    letter-spacing: var(--a11y-letter-spacing, 0em);
+    word-spacing: var(--a11y-word-spacing, 0em);
+  }
+
+  body {
+    font-family: var(--a11y-font-family-base, system-ui, sans-serif);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    min-height: var(--a11y-touch-target-min, 44px);
+    min-width: calc(var(--a11y-touch-target-min, 44px) * 0.75);
+    border-width: var(--a11y-border-width, 1px);
+    border-color: var(--a11y-border-default, hsl(var(--border)));
   }
 }

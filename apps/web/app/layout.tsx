@@ -1,8 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { runtimeConfig } from "@/config/runtime";
 import { getCurrentSubdomain } from "@/lib/subdomain";
 import { headers } from "next/headers";
+import { Toaster } from "@repo/ui";
+import { Providers } from "@/components/Providers";
 
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = await headers();
@@ -25,11 +26,12 @@ export default async function RootLayout({
   const subdomain = getCurrentSubdomain(host);
 
   return (
-    <html lang="en">
-      <body>
-        <div data-host={host} data-env={runtimeConfig.appEnv} data-subdomain={subdomain}>
+    <html lang="en" suppressHydrationWarning>
+      <body className="">
+        <Providers host={host} subdomain={subdomain}>
           {children}
-        </div>
+        </Providers>
+        <Toaster />
       </body>
     </html>
   );
