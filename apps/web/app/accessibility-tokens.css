@@ -1,0 +1,409 @@
+/**
+ * Accessibility Theme CSS Tokens
+ * 
+ * Base CSS custom properties for the accessibility theme system.
+ * These are overridden at runtime based on active dimensions.
+ * 
+ * Import this file in your root layout or globals.css
+ */
+
+:root {
+  /* ========================================================================
+     COLOR TOKENS
+     ======================================================================== */
+
+  /* Base backgrounds */
+  --a11y-bg-base: hsl(0 0% 100%);
+  --a11y-bg-elevated: hsl(0 0% 98%);
+  --a11y-bg-sunken: hsl(0 0% 96%);
+
+  /* Text colors */
+  --a11y-text-primary: hsl(240 10% 3.9%);
+  --a11y-text-secondary: hsl(240 5% 26%);
+  --a11y-text-tertiary: hsl(240 4% 46%);
+
+  /* Border colors */
+  --a11y-border-default: hsl(240 6% 90%);
+  --a11y-border-focus: hsl(240 6% 10%);
+
+  /* Interactive colors */
+  --a11y-interactive-primary: hsl(240 6% 10%);
+  --a11y-interactive-hover: hsl(240 6% 20%);
+  --a11y-interactive-active: hsl(240 6% 30%);
+  --a11y-interactive-disabled: hsl(0 0% 70%);
+
+  /* Semantic colors */
+  --a11y-success: hsl(142 76% 36%);
+  --a11y-warning: hsl(38 92% 50%);
+  --a11y-error: hsl(0 84% 60%);
+  --a11y-info: hsl(221 83% 53%);
+
+  /* ========================================================================
+     SPACING TOKENS
+     ======================================================================== */
+
+  --a11y-spacing-xs: 0.25rem;
+  --a11y-spacing-sm: 0.5rem;
+  --a11y-spacing-md: 1rem;
+  --a11y-spacing-lg: 1.5rem;
+  --a11y-spacing-xl: 2rem;
+  --a11y-touch-target-min: 44px;
+  --a11y-interactive-spacing: 0.5rem;
+
+  /* ========================================================================
+     TYPOGRAPHY TOKENS
+     ======================================================================== */
+
+  --a11y-font-family-base: system-ui, sans-serif;
+  --a11y-font-family-mono: ui-monospace, monospace;
+  --a11y-font-size-base: 1rem;
+  --a11y-font-size-scale: 1;
+  --a11y-line-height: 1.5;
+  --a11y-letter-spacing: 0em;
+  --a11y-word-spacing: 0em;
+  --a11y-paragraph-spacing: 1em;
+  --a11y-max-line-length: 80ch;
+
+  /* ========================================================================
+     BORDER TOKENS
+     ======================================================================== */
+
+  --a11y-border-width: 1px;
+  --a11y-border-radius: 0.375rem;
+  --a11y-focus-ring-width: 2px;
+  --a11y-focus-ring-offset: 2px;
+
+  /* ========================================================================
+     TIMING TOKENS
+     ======================================================================== */
+
+  --a11y-transition-duration: 150ms;
+  --a11y-animation-duration: 500ms;
+
+  /* ========================================================================
+     SHADOW TOKENS
+     ======================================================================== */
+
+  --a11y-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --a11y-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --a11y-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+  /* ========================================================================
+     DENSITY TOKEN
+     ======================================================================== */
+
+  --a11y-density-multiplier: 1;
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+
+/**
+ * Apply font scaling to elements
+ */
+.a11y-scaled-text {
+  font-size: calc(var(--a11y-font-size-base) * var(--a11y-font-size-scale));
+}
+
+/**
+ * Apply base typography settings
+ */
+.a11y-typography {
+  font-family: var(--a11y-font-family-base);
+  font-size: calc(var(--a11y-font-size-base) * var(--a11y-font-size-scale));
+  line-height: var(--a11y-line-height);
+  letter-spacing: var(--a11y-letter-spacing);
+  word-spacing: var(--a11y-word-spacing);
+}
+
+/**
+ * Apply max line length constraint
+ */
+.a11y-constrained-width {
+  max-width: var(--a11y-max-line-length);
+}
+
+/**
+ * Apply paragraph spacing
+ */
+.a11y-paragraph > * + * {
+  margin-top: var(--a11y-paragraph-spacing);
+}
+
+/**
+ * Ensure minimum touch target size
+ */
+.a11y-touch-target {
+  min-width: var(--a11y-touch-target-min);
+  min-height: var(--a11y-touch-target-min);
+}
+
+/**
+ * Apply enhanced focus styles
+ */
+.a11y-focus-enhanced:focus,
+.a11y-focus-enhanced:focus-visible {
+  outline: var(--a11y-focus-ring-width) solid var(--a11y-border-focus);
+  outline-offset: var(--a11y-focus-ring-offset);
+}
+
+/**
+ * Interactive spacing between elements
+ */
+.a11y-interactive-group > * + * {
+  margin-top: var(--a11y-interactive-spacing);
+}
+
+/**
+ * Apply density multiplier to spacing
+ */
+.a11y-dense-spacing {
+  padding: calc(var(--a11y-spacing-md) * var(--a11y-density-multiplier));
+}
+
+/**
+ * Disable transitions (motion preference: none)
+ */
+.a11y-no-motion,
+.a11y-no-motion * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/**
+ * Reduced motion
+ */
+.a11y-reduced-motion,
+.a11y-reduced-motion * {
+  animation-duration: var(--a11y-animation-duration);
+  transition-duration: var(--a11y-transition-duration);
+}
+
+/**
+ * High contrast borders
+ */
+.a11y-high-contrast-border {
+  border: var(--a11y-border-width) solid var(--a11y-border-default);
+}
+
+/**
+ * Skip links (always visible variant)
+ */
+.a11y-skip-link {
+  position: absolute;
+  top: var(--a11y-spacing-sm);
+  left: var(--a11y-spacing-sm);
+  padding: var(--a11y-spacing-sm) var(--a11y-spacing-md);
+  background: var(--a11y-bg-elevated);
+  color: var(--a11y-text-primary);
+  border: var(--a11y-border-width) solid var(--a11y-border-focus);
+  border-radius: var(--a11y-border-radius);
+  text-decoration: none;
+  z-index: 9999;
+}
+
+.a11y-skip-link:not(.a11y-always-visible) {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+.a11y-skip-link:not(.a11y-always-visible):focus {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.a11y-skip-link.a11y-always-visible {
+  position: relative;
+  display: inline-block;
+}
+
+/**
+ * Screen reader only content
+ */
+.a11y-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/**
+ * Focus-visible only (not for screen readers)
+ */
+.a11y-sr-only-focusable:not(:focus):not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/**
+ * Prevent text transformation overrides
+ */
+.a11y-no-italic {
+  font-style: normal !important;
+}
+
+.a11y-no-caps {
+  text-transform: none !important;
+}
+
+/**
+ * Emergency mode styles
+ */
+.a11y-emergency-mode {
+  --a11y-font-size-scale: 2;
+  --a11y-border-radius: 0;
+  --a11y-shadow-sm: none;
+  --a11y-shadow-md: none;
+  --a11y-shadow-lg: none;
+}
+
+/**
+ * Privacy mode (reduce readability distance)
+ */
+.a11y-privacy-mode {
+  filter: blur(0.5px);
+  letter-spacing: -0.02em;
+}
+
+.a11y-privacy-mode:hover,
+.a11y-privacy-mode:focus-within {
+  filter: none;
+  letter-spacing: var(--a11y-letter-spacing);
+}
+
+/* ============================================================================
+   COMPONENT BASE STYLES
+   ============================================================================ */
+
+/**
+ * Base button styles with accessibility tokens
+ */
+.a11y-button {
+  font-family: var(--a11y-font-family-base);
+  font-size: calc(var(--a11y-font-size-base) * var(--a11y-font-size-scale));
+  min-width: var(--a11y-touch-target-min);
+  min-height: var(--a11y-touch-target-min);
+  padding: var(--a11y-spacing-sm) var(--a11y-spacing-md);
+  background: var(--a11y-interactive-primary);
+  color: var(--a11y-bg-base);
+  border: var(--a11y-border-width) solid transparent;
+  border-radius: var(--a11y-border-radius);
+  cursor: pointer;
+  transition: all var(--a11y-transition-duration) ease;
+}
+
+.a11y-button:hover {
+  background: var(--a11y-interactive-hover);
+}
+
+.a11y-button:active {
+  background: var(--a11y-interactive-active);
+}
+
+.a11y-button:focus-visible {
+  outline: var(--a11y-focus-ring-width) solid var(--a11y-border-focus);
+  outline-offset: var(--a11y-focus-ring-offset);
+}
+
+.a11y-button:disabled {
+  background: var(--a11y-interactive-disabled);
+  cursor: not-allowed;
+}
+
+/**
+ * Base input styles with accessibility tokens
+ */
+.a11y-input {
+  font-family: var(--a11y-font-family-base);
+  font-size: calc(var(--a11y-font-size-base) * var(--a11y-font-size-scale));
+  min-height: var(--a11y-touch-target-min);
+  padding: var(--a11y-spacing-sm) var(--a11y-spacing-md);
+  background: var(--a11y-bg-base);
+  color: var(--a11y-text-primary);
+  border: var(--a11y-border-width) solid var(--a11y-border-default);
+  border-radius: var(--a11y-border-radius);
+  transition: border-color var(--a11y-transition-duration) ease;
+}
+
+.a11y-input:focus {
+  outline: var(--a11y-focus-ring-width) solid var(--a11y-border-focus);
+  outline-offset: var(--a11y-focus-ring-offset);
+  border-color: var(--a11y-border-focus);
+}
+
+.a11y-input::placeholder {
+  color: var(--a11y-text-tertiary);
+}
+
+/**
+ * Alert/notification styles
+ */
+.a11y-alert {
+  padding: var(--a11y-spacing-md);
+  border: var(--a11y-border-width) solid;
+  border-radius: var(--a11y-border-radius);
+  margin-bottom: var(--a11y-spacing-md);
+}
+
+.a11y-alert-info {
+  background: var(--a11y-bg-elevated);
+  border-color: var(--a11y-info);
+  color: var(--a11y-text-primary);
+}
+
+.a11y-alert-success {
+  background: var(--a11y-bg-elevated);
+  border-color: var(--a11y-success);
+  color: var(--a11y-text-primary);
+}
+
+.a11y-alert-warning {
+  background: var(--a11y-bg-elevated);
+  border-color: var(--a11y-warning);
+  color: var(--a11y-text-primary);
+}
+
+.a11y-alert-error {
+  background: var(--a11y-bg-elevated);
+  border-color: var(--a11y-error);
+  color: var(--a11y-text-primary);
+}
+
+/* ============================================================================
+   PRINT STYLES
+   ============================================================================ */
+
+@media print {
+  :root {
+    /* Force high contrast for print */
+    --a11y-bg-base: white;
+    --a11y-text-primary: black;
+    --a11y-border-default: black;
+
+    /* Remove shadows and animations */
+    --a11y-shadow-sm: none;
+    --a11y-shadow-md: none;
+    --a11y-shadow-lg: none;
+    --a11y-transition-duration: 0ms;
+    --a11y-animation-duration: 0ms;
+  }
+
+  .a11y-no-print {
+    display: none !important;
+  }
+}
