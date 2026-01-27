@@ -1,10 +1,17 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
-// JWT secret - in production, this should be from env var
+// JWT secret - MUST be set in production
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET environment variable is required in production. " +
+      "Generate a secure secret: openssl rand -base64 32"
+  );
+}
+
 const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-change-in-production";
-const JWT_EXPIRY = "24h";
+  process.env.JWT_SECRET || "dev-secret-key-change-in-production";
+const JWT_EXPIRY = "1h";
 
 export interface JWTPayload {
   userId: string;
@@ -40,9 +47,10 @@ export function verifyToken(token: string): JWTPayload | null {
 
 /**
  * Hash a password using bcrypt
+ * Cost factor: 12 (recommended for production security)
  */
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  return bcrypt.hash(password, 12);
 }
 
 /**
@@ -69,4 +77,45 @@ export function extractToken(
 
   // Fall back to cookie
   return cookieToken;
+}
+
+/**
+ * Check if token is expiring within the given minutes
+ * Used to determine if token refresh is needed
+ */
+export function isTokenExpiringSoon(
+  token: string,
+  withinMinutes: number = 5
+): boolean {
+  try {
+    const decoded = jwt.decode(token) as { exp?: number } | null;
+    if (!decoded || !decoded.exp) {
+      return true; // Invalid token, needs refresh
+    }
+
+    const expiryTime = decoded.exp * 1000; // Convert to milliseconds
+    const now = Date.now();
+    const timeUntilExpiry = expiryTime - now;
+    const thresholdMs = withinMinutes * 60 * 1000;
+
+    return timeUntilExpiry < thresholdMs;
+  } catch (error) {
+    console.error("Error checking token expiry:", error);
+    return true; // On error, assume needs refresh
+  }
+}
+
+/**
+ * Get token expiry time in ISO format
+ */
+export function getTokenExpiry(token: string): string | null {
+  try {
+    const decoded = jwt.decode(token) as { exp?: number } | null;
+    if (!decoded || !decoded.exp) {
+      return null;
+    }
+    return new Date(decoded.exp * 1000).toISOString();
+  } catch (error) {
+    return null;
+  }
 }

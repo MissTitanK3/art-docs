@@ -3,11 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ThemeToggle, AccessibilitySettingsSheet, Button } from '@repo/ui';
-import { Home, LogIn, UserPlus } from 'lucide-react';
+import { Home, LogIn, UserPlus, LogOut } from 'lucide-react';
 
 export default function AuthBanner() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
 
   return (
     <div className="w-full border-b bg-card text-card-foreground border-border">
@@ -31,14 +31,24 @@ export default function AuthBanner() {
                 onClick={() => router.push("/login")}
               >
                 <LogIn className="h-3.5 w-3.5 mr-1" />
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => router.push("/register")}
-              >
-                <UserPlus className="h-3.5 w-3.5 mr-1" />
+                Sign In/Up
               </Button>
             </div>
+          )}
+
+          {isAuthenticated && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                logout();
+                router.push("/");
+              }}
+              aria-label="Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5 mr-1" />
+              Sign Out
+            </Button>
           )}
 
           <div className="flex items-center gap-2 ml-auto">
@@ -51,7 +61,7 @@ export default function AuthBanner() {
         {isAuthenticated && (
           <div className="text-sm w-full text-center">
             Signed in as <strong className="font-semibold">{user?.email ?? 'Authenticated user'}</strong>
-            {user?.role && <span className="text-muted-foreground"> · {user.role}</span>}
+            {user?.role && <span className="text-muted-foreground capitalize"> · {user.role}</span>}
           </div>
         )}
       </div>

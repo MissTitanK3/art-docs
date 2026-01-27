@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   Badge,
   Button,
@@ -58,14 +59,17 @@ export function DispatchListAndDetail({
   loadDispatches,
 }: DispatchListAndDetailProps) {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
 
   return (
     <section className="space-y-4">
       {/* Filters */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border pb-4">
-        <div className="flex flex-col sm:flex-row gap-3 w-full">
+        <fieldset className="flex flex-col sm:flex-row gap-3 w-full">
+          <legend className="sr-only">Filter reports</legend>
           <Input
             placeholder="Filter by region (zip)"
+            aria-label="Filter reports by region zip code"
             value={filters.region_id}
             onChange={(e) =>
               setFilters({ ...filters, region_id: e.target.value })
@@ -73,7 +77,7 @@ export function DispatchListAndDetail({
             className="flex-1"
           />
           <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
-            <SelectTrigger className="w-full lg:w-40">
+            <SelectTrigger className="w-full lg:w-40" aria-label="Filter reports by status">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -86,7 +90,7 @@ export function DispatchListAndDetail({
             </SelectContent>
           </Select>
           <Select value={filters.urgency} onValueChange={(value) => setFilters({ ...filters, urgency: value })}>
-            <SelectTrigger className="w-full lg:w-40">
+            <SelectTrigger className="w-full lg:w-40" aria-label="Filter reports by urgency">
               <SelectValue placeholder="All Urgency" />
             </SelectTrigger>
             <SelectContent>
@@ -96,58 +100,69 @@ export function DispatchListAndDetail({
               <SelectItem value="critical">Critical</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={() => loadDispatches()}>
+          <Button variant="outline" onClick={() => loadDispatches()} aria-label="Apply filters to reports">
             Apply
           </Button>
-        </div>
+        </fieldset>
       </div>
 
       {/* Feed */}
       <div className="space-y-3">
         {listStatus === "loading" && (
           <div className="text-center py-12 text-muted-foreground">
-            Loading dispatches...
+            Loading reports...
           </div>
         )}
         {listStatus === "error" && (
           <div className="text-center py-12 text-destructive">
-            Failed to load dispatches.
+            Something went wrong. Please try again.
           </div>
         )}
         {listStatus !== "loading" && dispatches.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
-            No dispatches found. Try adjusting your filters.
+            No reports found. Try adjusting your filters.
           </div>
         )}
         {dispatches.map((item) => (
           <article
             key={item.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`Report from ${item.region_id}, urgency level ${item.urgency}, status ${item.status}. Click to view details.`}
+            aria-pressed="false"
             className={`bg-card border rounded-lg p-4 transition-colors cursor-pointer ${item.urgency === "critical"
-                ? "border-red-500 hover:border-red-600"
-                : item.urgency === "normal"
-                  ? "border-amber-500 hover:border-amber-600"
-                  : "border-blue-500 hover:border-blue-600"
+              ? "border-red-500 hover:border-red-600"
+              : item.urgency === "normal"
+                ? "border-amber-500 hover:border-amber-600"
+                : "border-blue-500 hover:border-blue-600"
               }`}
             onClick={() => router.push(`/dispatches/${item.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                router.push(`/dispatches/${item.id}`);
+              }
+            }}
           >
             <div className="flex items-start justify-between gap-3 mb-3 flex-col">
-              <div className="flex flex-wrap gap-1 items-center w-full m-auto justify-center">
-                <Badge variant="outline" className="font-mono text-primary bg-primary/10">
-                  {item.region_id}
-                </Badge>
-                <Badge variant="secondary">
-                  {item.status.toUpperCase()}
-                </Badge>
-                <Badge
-                  className={item.urgency === "critical"
-                    ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
-                    : item.urgency === "normal"
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                      : "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
-                  }
-                >
-                  {item.urgency.toUpperCase()}
-                </Badge>
+              <div className="flex flex-wrap gap-1 items-center w-full m-auto justify-between">
+                <div className="flex flex-wrap gap-3 items-center w-full m-auto justify-center">
+                  <Badge variant="outline" className="font-mono text-primary bg-primary/10">
+                    {item.region_id}
+                  </Badge>
+                  <Badge variant="secondary">
+                    {item.status.toUpperCase()}
+                  </Badge>
+                  <Badge
+                    className={item.urgency === "critical"
+                      ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
+                      : item.urgency === "normal"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+                    }
+                  >
+                    {item.urgency.toUpperCase()}
+                  </Badge>
+                </div>
               </div>
               <Separator />
               <time className="text-xs text-muted-foreground whitespace-nowrap">
@@ -161,10 +176,10 @@ export function DispatchListAndDetail({
             </div>
 
             <p className="text-sm text-foreground line-clamp-3">
-              {item.description ?? "(PII redacted for unauthenticated users)"}
+              {isAuthenticated ? item.description : "Be signed in and vetted to view report details."}
             </p>
 
-            {item.location_description && (
+            {isAuthenticated && item.location_description && (
               <p className="text-xs text-muted-foreground mt-2 line-clamp-1">
                 📍 {item.location_description}
               </p>

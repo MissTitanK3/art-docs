@@ -65,6 +65,7 @@
 
 ## Technology Stack
 - **Framework:** React/Next.js (route for detail: `/dispatches/[id]` or modal overlay)
+- **API Delivery:** Next.js API routes (same app); no separate backend service this sprint
 - **Data Fetching:** React hooks (`useEffect`), Suspense or loader functions in Next.js
 - **State Management:** React hooks or lightweight store (avoid Redux if not needed)
 - **Styling:** CSS modules or Tailwind (match Sprint 1 patterns)
@@ -75,13 +76,14 @@
 - **Sprint 0 Complete:** All 6 blockers resolved ([API](/specs/backend-api-contracts), [Schema](/specs/database-schema), [Auth](/specs/authentication-architecture), [Offline](/specs/offline-support-architecture), [Regions](/specs/region-scope-architecture), [Modes](/specs/crisis-management-mode-strategy))
 - **Sprint 1 Complete:** Intake form deployed; dispatch records created with intent, location, submitter, timestamp
 - **Runtime Config:** API base URL and domains configured per environment via `runtimeConfig`
+- **Backend Delivery:** Next.js API routes within the web app (no dedicated backend server for Sprint 2)
 - **Auth:** Users authenticated with JWT; submitter_id and roles available from session ([Auth Spec](/specs/authentication-architecture))
 - **API Endpoints:** `GET /dispatches?active=true&limit=20&offset=0` and `GET /dispatches/:id` available and tested
 
 ## Scope and Non-Scope
 **Scope:**
 - Active dispatch list with minimal columns (intent/summary, location, status, updated time).
-- Lightweight detail view for a single dispatch (include key metadata and history if available).
+- Lightweight detail view for a single dispatch (include key metadata and history if available). For authenticated users, show intent/summary, location, submitter, timestamps, current status, and any available history (read-only).
 - Basic empty state and loading/error states.
 - Pagination or "load more" affordance (backend-driven pagination only; no client-side filtering).
 - Responsive design supporting mobile and desktop.
