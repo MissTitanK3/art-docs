@@ -17,7 +17,7 @@ export default function DispatchDetail({ id }: { id: string }) {
         const d = await getDispatch(id, token);
         setData(d);
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Failed to load dispatch';
+        const message = err instanceof Error ? err.message : 'We couldn\'t load this dispatch. Try refreshing the page.';
         setError(message);
       } finally {
         setLoading(false);

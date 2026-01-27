@@ -189,15 +189,34 @@ export default function DispatchDetailPage({ params }: { params: Promise<{ id: s
         {status === "loading" && (
           <Card>
             <CardContent className="p-8 text-center text-muted-foreground">
-              Loading dispatch details...
+              Loading details…
             </CardContent>
           </Card>
         )}
 
         {status === "error" && (
           <Card>
-            <CardContent className="p-8 text-center text-destructive">
-              We couldn&apos;t load this dispatch right now.
+            <CardContent className="p-8 text-center space-y-4">
+              <p className="text-destructive">
+                We couldn&apos;t load this dispatch right now.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                It might have been removed, or there could be a connection issue.
+              </p>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.reload()}
+                >
+                  Try again
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => router.push("/dispatches")}
+                >
+                  Back to list
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -326,7 +345,7 @@ export default function DispatchDetailPage({ params }: { params: Promise<{ id: s
                         </h3>
                         <p className="text-foreground text-sm">
                           {locationAreaStatus === "loading" && "Looking this up..."}
-                          {locationAreaStatus === "error" && "Could not fetch city and state."}
+                          {locationAreaStatus === "error" && "Couldn't look up the area name right now."}
                           {locationAreaStatus === "idle" && (locationArea || "—")}
                         </p>
                       </div>

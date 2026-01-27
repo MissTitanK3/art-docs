@@ -30,9 +30,11 @@ type DispatchItem = {
 
 type Pagination = {
   limit: number;
-  cursor: string | null;
-  next_cursor: string | null;
+  offset: number;
+  next_offset: number | null;
+  prev_offset: number | null;
   has_more: boolean;
+  total: number;
 };
 
 type Filters = {
@@ -47,7 +49,7 @@ interface DispatchListAndDetailProps {
   listStatus: "idle" | "loading" | "success" | "error";
   filters: Filters;
   setFilters: (filters: Filters) => void;
-  loadDispatches: (cursor?: string) => void;
+  loadDispatches: (nextOffset?: number) => void;
 }
 
 export function DispatchListAndDetail({
@@ -193,7 +195,8 @@ export function DispatchListAndDetail({
         <div className="text-center pt-4">
           <Button
             variant="outline"
-            onClick={() => loadDispatches(pagination?.next_cursor || undefined)}
+            onClick={() => loadDispatches(pagination?.next_offset ?? undefined)}
+            disabled={!pagination?.next_offset}
           >
             Load more
           </Button>

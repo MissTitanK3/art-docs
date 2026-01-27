@@ -21,9 +21,11 @@ type DispatchItem = {
 
 type Pagination = {
   limit: number;
-  cursor: string | null;
-  next_cursor: string | null;
+  offset: number;
+  next_offset: number | null;
+  prev_offset: number | null;
   has_more: boolean;
+  total: number;
 };
 
 type DispatchResponse = {
@@ -46,14 +48,15 @@ export default function Home() {
   const [dispatches, setDispatches] = useState<DispatchItem[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
 
-  const loadDispatches = async (cursor?: string) => {
+  const loadDispatches = async (nextOffset?: number) => {
     setListStatus("loading");
 
     const params = new URLSearchParams();
     if (filters.region_id) params.set("region_id", filters.region_id);
     if (filters.status && filters.status !== "all") params.set("status", filters.status);
     if (filters.urgency && filters.urgency !== "all") params.set("urgency", filters.urgency);
-    if (cursor) params.set("cursor", cursor);
+    params.set("limit", "20");
+    params.set("offset", String(nextOffset ?? 0));
 
     try {
       const response = await fetch(`/api/dispatches?${params.toString()}`, {
@@ -69,7 +72,7 @@ export default function Home() {
       }
 
       const list = data as DispatchResponse;
-      setDispatches(cursor ? [...dispatches, ...list.dispatches] : list.dispatches);
+      setDispatches(nextOffset && nextOffset > 0 ? [...dispatches, ...list.dispatches] : list.dispatches);
       setPagination(list.pagination);
       setListStatus("success");
     } catch {
