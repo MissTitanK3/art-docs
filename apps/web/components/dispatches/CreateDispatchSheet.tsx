@@ -370,16 +370,11 @@ export function CreateDispatchSheet({
       <SheetContent
         side="right"
         className="w-full sm:max-w-lg overflow-y-auto"
-        role="dialog"
-        aria-labelledby="dispatch-title"
-        aria-describedby="dispatch-description"
       >
-        <SheetTitle id="dispatch-title">Report something</SheetTitle>
-        <SheetHeader>
-          <SheetDescription id="dispatch-description" className="mt-3">
-            Share what is happening in your area. Approximate location is fine.
-          </SheetDescription>
-        </SheetHeader>
+        <SheetTitle>Report something</SheetTitle>
+        <SheetDescription className="mt-2">
+          Share what is happening in your area. Approximate location is fine.
+        </SheetDescription>
 
         <div className="mt-6 space-y-3">
           <fieldset className="rounded-lg border border-border bg-muted/40 p-4 space-y-2">

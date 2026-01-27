@@ -42,7 +42,7 @@ export default function DispatchList() {
         }
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load dispatches';
+      const message = err instanceof Error ? err.message : 'We couldn\'t fetch the dispatch list. Refresh to try again.';
       setError(message);
     } finally {
       setLoading(false);
@@ -59,7 +59,14 @@ export default function DispatchList() {
       <h2 className="text-lg font-semibold">Active Dispatches</h2>
 
       {loading && <div className="text-sm text-muted-foreground">Loading dispatches…</div>}
-      {error && <div className="text-destructive text-sm">{error}</div>}
+      {error && (
+        <div className="text-destructive text-sm space-y-2">
+          <p>{error}</p>
+          <Button variant="outline" size="sm" onClick={() => fetchList(offset)}>
+            Try again
+          </Button>
+        </div>
+      )}
       {!loading && items.length === 0 && (
         <div className="text-sm text-muted-foreground">No active dispatches.</div>
       )}
