@@ -94,6 +94,7 @@ export function AccessibilitySettingsSheet() {
         side="right"
         className="w-full sm:max-w-lg flex flex-col max-h-[100vh] overflow-hidden"
       >
+        <SheetTitle>Accessibility Settings</SheetTitle>
         <SheetHeader>
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -104,7 +105,6 @@ export function AccessibilitySettingsSheet() {
               >
                 Reset all
               </Button>
-              <SheetTitle>Accessibility Settings</SheetTitle>
               <SheetDescription>
                 Adjust presets and fine-tune motion, text, and control settings.
               </SheetDescription>
@@ -113,9 +113,6 @@ export function AccessibilitySettingsSheet() {
         </SheetHeader>
 
         <div className="mt-6 space-y-6 overflow-y-auto pr-1 flex-1">
-          <h3>
-
-          </h3>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Preset</label>

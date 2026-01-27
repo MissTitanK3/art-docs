@@ -1,49 +1,37 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Button, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
+import { getDispatch, type Dispatch } from "@/lib/api";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@repo/ui";
 import { ArrowLeft } from "lucide-react";
-
-type DispatchDetail = {
-  id: string;
-  region_id: string;
-  location_lat: number;
-  location_lon: number;
-  location_description: string | null;
-  location_precision: string;
-  description: string | null;
-  urgency: string;
-  status: string;
-  created_at: string;
-  updated_at?: string;
-};
+import "leaflet/dist/leaflet.css";
 
 export default function DispatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { token } = useAuth();
-  const [dispatch, setDispatch] = useState<DispatchDetail | null>(null);
+  const { isAuthenticated, token } = useAuth();
+  const [dispatch, setDispatch] = useState<Dispatch | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("loading");
+  const [locationArea, setLocationArea] = useState<string | null>(null);
+  const [locationAreaStatus, setLocationAreaStatus] = useState<
+    "idle" | "loading" | "error"
+  >("idle");
+  const mapPreviewRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<import("leaflet").Map | null>(null);
+  const markerRef = useRef<import("leaflet").CircleMarker | null>(null);
+  const statusLabel = dispatch?.status_display || dispatch?.status || "";
 
   useEffect(() => {
     const loadDispatch = async () => {
       setStatus("loading");
       try {
-        const response = await fetch(`/api/dispatches/${id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to load dispatch");
-        }
-
-        const data = await response.json();
+        const data = await getDispatch(id, token || undefined);
         setDispatch(data);
         setStatus("success");
-      } catch {
+      } catch (err) {
+        console.error("[DispatchDetailPage] Failed to load dispatch:", err instanceof Error ? err.message : err);
         setStatus("error");
       }
     };
@@ -53,17 +41,149 @@ export default function DispatchDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [id, token]);
 
+  useEffect(() => {
+    const lookupCityState = async () => {
+      if (!dispatch) return;
+      setLocationAreaStatus("loading");
+      try {
+        const res = await fetch(
+          `/api/geocode/reverse?lat=${dispatch.location.lat}&lon=${dispatch.location.lon}`
+        );
+        if (!res.ok) {
+          throw new Error("Lookup failed");
+        }
+        const data = await res.json();
+        const address = data?.address ?? {};
+        const city =
+          address.city ||
+          address.town ||
+          address.village ||
+          address.hamlet ||
+          address.suburb;
+        const state = address.state || address.county;
+        const label = [city, state].filter(Boolean).join(", ");
+        setLocationArea(label || null);
+        setLocationAreaStatus("idle");
+      } catch {
+        setLocationArea(null);
+        setLocationAreaStatus("error");
+      }
+    };
+
+    lookupCityState();
+  }, [dispatch?.location?.lat, dispatch?.location?.lon, dispatch]);
+
+  useEffect(() => {
+    if (!dispatch) return;
+
+    let disposed = false;
+
+    const renderMap = async () => {
+      if (!mapPreviewRef.current) return;
+      const L = await import("leaflet");
+      if (disposed) return;
+
+      // HMR safety: Leaflet can leave an internal id on the container
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const containerAny = mapPreviewRef.current as any;
+      if (containerAny._leaflet_id) {
+        delete containerAny._leaflet_id;
+      }
+
+      if (!mapInstanceRef.current) {
+        const map = L.map(mapPreviewRef.current, {
+          center: [dispatch.location.lat, dispatch.location.lon],
+          zoom: 13,
+          zoomControl: false,
+          attributionControl: false,
+          dragging: true,
+          scrollWheelZoom: false,
+          doubleClickZoom: false,
+          boxZoom: false,
+          keyboard: false,
+          touchZoom: true,
+        });
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap contributors",
+          maxZoom: 19,
+        }).addTo(map);
+
+        mapInstanceRef.current = map;
+      }
+
+      const map = mapInstanceRef.current;
+      map.setView([dispatch.location.lat, dispatch.location.lon], 13, {
+        animate: false,
+      });
+
+      if (!markerRef.current) {
+        markerRef.current = L.circleMarker(
+          [dispatch.location.lat, dispatch.location.lon],
+          {
+            radius: 7,
+            color: "#2563eb",
+            fillColor: "#1d4ed8",
+            fillOpacity: 0.85,
+            weight: 2,
+            interactive: false,
+          }
+        ).addTo(map);
+      } else {
+        markerRef.current.setLatLng([dispatch.location.lat, dispatch.location.lon]);
+      }
+    };
+
+    void renderMap();
+
+    return () => {
+      disposed = true;
+    };
+  }, [dispatch]);
+
+  useEffect(() => {
+    const container = mapPreviewRef.current;
+    return () => {
+      if (markerRef.current) {
+        markerRef.current.remove();
+        markerRef.current = null;
+      }
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.off();
+          mapInstanceRef.current.remove();
+        } catch {
+          // ignore if map was already disposed
+        }
+        mapInstanceRef.current = null;
+      }
+      if (container) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const containerAny = container as any;
+        if (containerAny._leaflet_id) {
+          delete containerAny._leaflet_id;
+        }
+      }
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-4 py-8">
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/")}
+          onClick={() => {
+            if (window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/dispatches");
+            }
+          }}
           className="mb-6"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to feed
+          Back to list
         </Button>
 
         {status === "loading" && (
@@ -77,7 +197,7 @@ export default function DispatchDetailPage({ params }: { params: Promise<{ id: s
         {status === "error" && (
           <Card>
             <CardContent className="p-8 text-center text-destructive">
-              Failed to load dispatch details
+              We couldn&apos;t load this dispatch right now.
             </CardContent>
           </Card>
         )}
@@ -85,19 +205,18 @@ export default function DispatchDetailPage({ params }: { params: Promise<{ id: s
         {status === "success" && dispatch && (
           <Card>
             <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-2xl">Dispatch Details</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
+              <div className="flex flex-col items-start justify-between">
+                <CardTitle className="text-2xl">Report Details</CardTitle>
+                <div className="flex gap-2 justify-evenly w-full mt-4">
+                  <Badge>
                     ID: {dispatch.id}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <span className="rounded-full bg-muted px-3 py-1 text-sm text-foreground">
-                    {dispatch.status}
-                  </span>
-                  <span
-                    className={`rounded-full px-3 py-1 text-sm ${dispatch.urgency === "critical"
+                  </Badge>
+                  <Badge variant="outline" className="bg-muted text-foreground border-transparent capitalize">
+                    {statusLabel}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className={`capitalize border-transparent ${dispatch.urgency === "critical"
                       ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
                       : dispatch.urgency === "normal"
                         ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
@@ -105,52 +224,23 @@ export default function DispatchDetailPage({ params }: { params: Promise<{ id: s
                       }`}
                   >
                     {dispatch.urgency}
-                  </span>
+                  </Badge>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">
-                    Description
-                  </h3>
-                  <p className="text-foreground">
-                    {dispatch.description ?? "PII redacted for unauthenticated users"}
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">
-                    Location Description
-                  </h3>
-                  <p className="text-foreground">
-                    {dispatch.location_description || "—"}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+              {/* Limited view for unauthenticated users */}
+              {!isAuthenticated && (
+                <div className="space-y-4">
                   <div>
                     <h3 className="text-sm font-semibold text-muted-foreground mb-1">
-                      Region
+                      Status overview
                     </h3>
-                    <p className="font-mono text-primary">{dispatch.region_id}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground mb-1">
-                      Precision
-                    </h3>
-                    <p className="text-foreground">{dispatch.location_precision}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground mb-1">
-                      Coordinates
-                    </h3>
-                    <p className="text-foreground font-mono text-sm">
-                      {dispatch.location_lat.toFixed(4)}, {dispatch.location_lon.toFixed(4)}
+                    <p className="text-foreground text-sm">
+                      This report is currently <span className="font-semibold">{statusLabel}</span> with an urgency of <span className="font-semibold">{dispatch.urgency}</span>.
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Sign in to view full details, location, and coordination updates.
                     </p>
                   </div>
                   <div>
@@ -162,7 +252,110 @@ export default function DispatchDetailPage({ params }: { params: Promise<{ id: s
                     </p>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* Full view for authenticated users */}
+              {isAuthenticated && (
+                <div className="grid gap-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-1">
+                      What&apos;s happening?
+                    </h3>
+                    <p className="text-foreground">
+                      {dispatch.description ?? "No description provided."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-1">
+                      Anything else about this place?
+                    </h3>
+                    <p className="text-foreground">
+                      {dispatch.location_description || "—"}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground mb-1">
+                        Area (Zipcode)
+                      </h3>
+                      <p className="font-mono text-primary">{dispatch.region_id}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground mb-1">
+                        How close is this?
+                      </h3>
+                      <p className="text-foreground capitalize">{dispatch.location_precision}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground mb-1">
+                        Submitted by
+                      </h3>
+                      <p className="text-foreground text-sm">
+                        {dispatch.client_id || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground mb-1">
+                        Last updated
+                      </h3>
+                      <p className="text-foreground text-sm">
+                        {new Date(dispatch.updated_at ?? dispatch.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-1">
+                      Created
+                    </h3>
+                    <p className="text-foreground text-sm">
+                      {new Date(dispatch.created_at).toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-semibold text-muted-foreground mb-1">
+                          Location overview
+                        </h3>
+                        <p className="text-foreground text-sm">
+                          {locationAreaStatus === "loading" && "Looking this up..."}
+                          {locationAreaStatus === "error" && "Could not fetch city and state."}
+                          {locationAreaStatus === "idle" && (locationArea || "—")}
+                        </p>
+                      </div>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="font-normal"
+                      >
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${dispatch.location.lat},${dispatch.location.lon}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open map
+                        </a>
+                      </Button>
+                    </div>
+
+                    <div className="h-56 w-full overflow-hidden rounded-lg border border-border">
+                      <div
+                        ref={mapPreviewRef}
+                        className="h-full w-full"
+                        aria-label="Map preview"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

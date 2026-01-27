@@ -1,13 +1,9 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { useSubdomain } from "@/lib/hooks/useSubdomain";
-import { runtimeConfig } from "@/config/runtime";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { CreateDispatchSheet } from "@/components/dispatches/CreateDispatchSheet";
 import { DispatchListAndDetail } from "@/components/dispatches/DispatchListAndDetail";
-
-// User type removed from local page state; auth handled via route
 
 type DispatchItem = {
   id: string;
@@ -88,17 +84,19 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background">
+      <div className="pt-3 flex justify-center">
+        <CreateDispatchSheet
+          isAuthenticated={isAuthenticated}
+          token={token}
+          onSuccess={loadDispatches}
+        />
+      </div>
       <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Report Feed</h1>
             <p className="text-sm text-muted-foreground">Live reports from your community</p>
           </div>
-          <CreateDispatchSheet
-            isAuthenticated={isAuthenticated}
-            token={token}
-            onSuccess={loadDispatches}
-          />
         </div>
 
         <DispatchListAndDetail

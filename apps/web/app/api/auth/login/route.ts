@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
     response.cookies.set("auth_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24, // 24 hours
+      sameSite: "strict",
+      maxAge: 60 * 60, // 1 hour (matches JWT expiry)
       path: "/",
     });
 

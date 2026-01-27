@@ -40,6 +40,12 @@ export const createDispatchSchema = z.object({
     precision: z
       .enum(["exact", "block", "neighborhood", "city"])
       .default("block"),
+    radius_meters: z
+      .number()
+      .int()
+      .min(100, "Radius must be at least 100 meters")
+      .max(5000, "Radius must be 5km or less")
+      .optional(),
   }),
   description: z
     .string()
@@ -54,11 +60,19 @@ export const createDispatchSchema = z.object({
 export const listDispatchesSchema = z.object({
   region_id: z.string().optional(),
   status: z
-    .enum(["open", "acknowledged", "escalated", "closed", "reopened"])
+    .enum([
+      "open",
+      "acknowledged",
+      "escalated",
+      "closed",
+      "reopened",
+      "cancelled",
+    ])
     .optional(),
   urgency: z.enum(["low", "normal", "critical"]).optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-  cursor: z.string().optional(), // ISO 8601 timestamp
+  active: z.coerce.boolean().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

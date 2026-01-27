@@ -40,13 +40,32 @@ export async function GET(
       );
     }
 
-    // Apply PII redaction if not authenticated
+    const statusDisplay = [
+      "open",
+      "acknowledged",
+      "escalated",
+      "reopened",
+    ].includes(dispatch.status)
+      ? dispatch.status === "acknowledged"
+        ? "Pending"
+        : "Active"
+      : dispatch.status === "closed"
+        ? "Closed"
+        : "Cancelled";
+
     if (!userId) {
       dispatch.description = null;
       dispatch.location_description = null;
     }
 
-    return NextResponse.json(dispatch, { status: 200 });
+    return NextResponse.json(
+      {
+        ...dispatch,
+        status_display: statusDisplay,
+        updated_at: dispatch.updated_at ?? dispatch.created_at,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error fetching dispatch:", error);
     return NextResponse.json(

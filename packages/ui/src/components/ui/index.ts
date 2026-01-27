@@ -9,3 +9,4 @@ export * from "./select";
 export * from "./sheet";
 export * from "./badge";
 export * from "./separator";
+export * from "./slider";

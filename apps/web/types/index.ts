@@ -10,7 +10,7 @@ export type User = {
 export type Location = { lat: number; lon: number };
 
 export type DispatchStatus = "open" | "acknowledged" | "escalated" | "closed";
-export type DispatchUrgency = "low" | "normal" | "high";
+export type DispatchUrgency = "low" | "normal" | "critical";
 
 export type Dispatch = {
   id: string;
